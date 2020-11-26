@@ -66,11 +66,15 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
+    - name: Build
+        run: |
+          cd win
+          .\make_win64.bat
     - name: Prepare
       shell: bash
       run: |
         mkdir -p qjs/Lib/Win64/
-        cp build/libquickjs.a qjs/Lib/Win64/quickjs.lib
+        cp win/quickjs.lib qjs/Lib/Win64/quickjs.lib
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
