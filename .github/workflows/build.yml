@@ -70,7 +70,7 @@ jobs:
       shell: bash
       run: |
         mkdir -p qjs/Lib/Win64/
-        cp build/libquickjs.a qjs/Lib/Win64/libquickjs.a
+        cp build/libquickjs.a qjs/Lib/Win64/quickjs.lib
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
@@ -97,7 +97,7 @@ jobs:
       shell: bash
       run: |
         mkdir -p qjs/Lib/Win32/
-        cp build/libquickjs.a qjs/Lib/Win32/libquickjs.a
+        cp build/libquickjs.a qjs/Lib/Win32/quickjs.lib
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
