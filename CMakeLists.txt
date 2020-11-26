@@ -40,7 +40,7 @@ add_library(quickjs STATIC
         src/v8-impl.cc
         )
 set_target_properties(quickjs PROPERTIES
-        C_STANDARD 11
+        C_STANDARD 99
         C_STANDARD_REQUIRED ON
         )
 target_compile_options(quickjs PRIVATE ${qjs_cflags})
