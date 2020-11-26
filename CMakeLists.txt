@@ -39,12 +39,13 @@ add_library(quickjs STATIC
         quickjs/quickjs.c
         src/v8-impl.cc
         )
-set_target_properties(quickjs PROPERTIES
-        C_STANDARD 99
-        C_STANDARD_REQUIRED ON
-        )
+#set_target_properties(quickjs PROPERTIES
+#        C_STANDARD 99
+#        C_STANDARD_REQUIRED ON
+#        )
 target_compile_options(quickjs PRIVATE ${qjs_cflags})
 target_compile_definitions(quickjs PRIVATE
+        _GNU_SOURCE
         CONFIG_BIGNUM
         CONFIG_VERSION="${QJS_VERSION_STR}"
         )
