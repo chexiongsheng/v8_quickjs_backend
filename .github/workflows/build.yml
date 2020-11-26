@@ -14,7 +14,7 @@ jobs:
         ./make_osx.sh
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_bin
+        name: qjs_v8
         path: ~/qjs/**/*
         
   build_ios:
@@ -27,7 +27,7 @@ jobs:
         ./make_ios.sh
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_bin
+        name: qjs_v8
         path: ~/qjs/**/*
 
   build_android:
@@ -47,7 +47,7 @@ jobs:
         ./make_android.sh
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_bin
+        name: qjs_v8
         path: ~/qjs/**/*
 
   build_window:
@@ -73,7 +73,7 @@ jobs:
         cp build/Release/libquickjs.a qjs/Lib/Win64/libquickjs.a
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_bin
+        name: qjs_v8
         path: qjs/**/*
 
   build_window_32:
@@ -100,5 +100,5 @@ jobs:
         cp build/Release/libquickjs.a qjs/Lib/Win32/libquickjs.a
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_bin
+        name: qjs_v8
         path: qjs/**/*
