@@ -66,7 +66,7 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
-        find / -name libmingwex.a
+        cp /mingw64/x86_64-w64-mingw32/lib/libmingwex.a ./libmingwex.a
     - name: Build
       run: |
         cd win
@@ -75,7 +75,7 @@ jobs:
     - name: Merge Libs
       run: |
         cd win
-        LIB.EXE /OUT:quickjs.lib ..\build\libquickjs.a build\Release\v8qjs.lib
+        LIB.EXE /OUT:quickjs.lib ..\build\libquickjs.a build\Release\v8qjs.lib ..\libmingwex.a
     - name: Prepare
       shell: bash
       run: |
@@ -103,7 +103,7 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
-        find / -name libmingwex.a
+        cp /mingw32/i686-w64-mingw32/lib/libmingwex.a ./libmingwex.a
     - name: Prepare
       shell: bash
       run: |
