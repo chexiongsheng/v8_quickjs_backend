@@ -1,38 +1,9 @@
-#include "quickjs.h"
 #include "v8.h"
 #include<cstring>
 
-JSValue JS_NewFloat64_(JSContext *ctx, double d) {
-    return JS_NewFloat64(ctx, d);
-}
+#define JS_INITVAL(s, t, val) s.tag = t, s.u.int32=val
 
-JSValue JS_NewStringLen_(JSContext *ctx, const char *str1, size_t len1) {
-    return JS_NewStringLen(ctx, str1, len1);
-}
-
-JSValue JS_NewInt32_(JSContext *ctx, int32_t val) {
-    return JS_NewInt32(ctx, val);
-}
-
-JSValue JS_NewUint32_(JSContext *ctx, uint32_t val) {
-    return JS_NewUint32(ctx, val);
-}
-
-JSValue JS_True() {
-    return JS_TRUE;
-}
-
-JSValue JS_False() {
-    return JS_FALSE;
-}
-
-JSValue JS_Null() {
-    return JS_NULL;
-}
-
-JSValue JS_Undefined() {
-    return JS_UNDEFINED;
-}
+#define JS_INITPTR(s, t, p) s.tag = t, s.u.ptr = p
 
 namespace v8 {
 namespace platform {
@@ -190,7 +161,7 @@ Script::~Script() {
 
 Local<External> External::New(Isolate* isolate, void* value) {
     External* external = new External();
-    external->u_.value_ = JS_MKPTR(JS_TAG_EXTERNAL, value);
+    JS_INITPTR(external->u_.value_, JS_TAG_EXTERNAL, value);
     return Local<External>(external);
 }
 
@@ -204,13 +175,13 @@ double Number::Value() const {
 
 Local<Number> Number::New(Isolate* isolate, double value) {
     Number* ret = new Number();
-    ret->u_.value_ = JS_NewFloat64(isolate->GetCurrentContext()->context_, value);
+    ret->u_.value_ = JS_NewFloat64_(isolate->GetCurrentContext()->context_, value);
     return Local<Number>(ret);
 }
 
 Local<Integer> Integer::New(Isolate* isolate, int32_t value) {
     Integer* ret = new Integer();
-    ret->u_.value_ = JS_MKVAL(JS_TAG_INT, value);
+    JS_INITVAL(ret->u_.value_, JS_TAG_INT, value);
     return Local<Integer>(ret);
 }
 
@@ -220,13 +191,13 @@ bool Boolean::Value() const {
 
 Local<Boolean> Boolean::New(Isolate* isolate, bool value) {
     Boolean* ret = new Boolean();
-    ret->u_.value_ = JS_MKVAL(JS_TAG_BOOL, (value != 0));
+    JS_INITVAL(ret->u_.value_, JS_TAG_BOOL, (value != 0));
     return Local<Boolean>(ret);
 }
 
 Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
     Integer* ret = new Integer();
-    ret->u_.value_ = JS_NewUint32(isolate->GetCurrentContext()->context_, value);;
+    ret->u_.value_ = JS_NewUint32_(isolate->GetCurrentContext()->context_, value);;
     return Local<Integer>(ret);
 }
 
@@ -288,7 +259,6 @@ Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback
 
 MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
-        JSValue ret = JS_UNDEFINED;
         Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
         Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
         FunctionCallbackInfo<Value> callbackInfo;
@@ -298,7 +268,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         callbackInfo.context_ = ctx;
         callbackInfo.this_ = this_val;
         callbackInfo.magic_ = magic;
-        callbackInfo.value_ = JS_UNDEFINED;
+        callbackInfo.value_ = JS_Undefined();
         
         functionTemplate->callback_(callbackInfo);
         

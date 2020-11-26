@@ -15,36 +15,7 @@
 #include "libplatform/libplatform.h"
 
 #include "v8config.h"     // NOLINT(build/include_directory)
-
-#ifndef JSValueConst
-typedef union JSValueUnion {
-    int32_t int32;
-    double float64;
-    void *ptr;
-} JSValueUnion;
-
-typedef struct JSValue {
-    JSValueUnion u;
-    int64_t tag;
-} JSValue;
-
-typedef struct JSRuntime JSRuntime;
-typedef struct JSContext JSContext;
-typedef struct JSObject JSObject;
-typedef struct JSClass JSClass;
-
-#define JSValueConst JSValue
-#endif
-
-//wrap
-JSValue JS_NewFloat64_(JSContext *ctx, double d);
-JSValue JS_NewStringLen_(JSContext *ctx, const char *str1, size_t len1);
-JSValue JS_NewInt32_(JSContext *ctx, int32_t val);
-JSValue JS_NewUint32_(JSContext *ctx, uint32_t val);
-JSValue JS_True();
-JSValue JS_False();
-JSValue JS_Null();
-JSValue JS_Undefined();
+#include "quickjs-msvc.h"
 
 #define JS_TAG_EXTERNAL (JS_TAG_FLOAT64 + 1)
 

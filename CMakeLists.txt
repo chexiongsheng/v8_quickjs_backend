@@ -22,16 +22,16 @@ else()
             -Wno-unused-but-set-variable)
 endif()
 
-if ( NOT ANDROID AND NOT APPLE )
-    if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-        list(APPEND qjs_cflags
-            -mabi=ms )
-    else()
-        list(APPEND qjs_cflags
-            -maccumulate-outgoing-args
-            -mabi=ms )
-    endif()
-endif()
+#if ( NOT ANDROID AND NOT APPLE )
+#    if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+#        list(APPEND qjs_cflags
+#            -mabi=ms )
+#    else()
+#        list(APPEND qjs_cflags
+#            -maccumulate-outgoing-args
+#            -mabi=ms )
+#    endif()
+#endif()
 
 file(STRINGS "quickjs/VERSION" QJS_VERSION_STR)
 
@@ -49,6 +49,7 @@ add_library(quickjs STATIC
         quickjs/libunicode.c
         quickjs/quickjs.c
         src/v8-impl.cc
+        src/quickjs-wrap.c
         )
 #set_target_properties(quickjs PROPERTIES
 #        C_STANDARD 99
