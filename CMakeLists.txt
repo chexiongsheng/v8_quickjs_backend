@@ -43,7 +43,6 @@ add_library(quickjs STATIC
 #        C_STANDARD 99
 #        C_STANDARD_REQUIRED ON
 #        )
-set(CMAKE_C_FLAGS "-g ${CMAKE_C_FLAGS} -MMD -MF")
 target_compile_options(quickjs PRIVATE ${qjs_cflags})
 target_compile_definitions(quickjs PRIVATE
         _GNU_SOURCE
