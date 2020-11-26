@@ -22,6 +22,17 @@ else()
             -Wno-unused-but-set-variable)
 endif()
 
+if ( NOT ANDROID AND NOT APPLE )
+    if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
+        list(APPEND qjs_cflags
+            -mabi=ms )
+    else()
+        list(APPEND qjs_cflags
+            -maccumulate-outgoing-args
+            -mabi=ms )
+    endif()
+endif()
+
 file(STRINGS "quickjs/VERSION" QJS_VERSION_STR)
 
 set (CMAKE_CXX_STANDARD 14)
