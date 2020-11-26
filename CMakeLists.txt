@@ -22,16 +22,17 @@ else()
             -Wno-unused-but-set-variable)
 endif()
 
-#if ( NOT ANDROID AND NOT APPLE )
-#    if("${CMAKE_SIZEOF_VOID_P}" STREQUAL "4")
-#        list(APPEND qjs_cflags
-#            -mabi=ms )
-#    else()
-#        list(APPEND qjs_cflags
-#            -maccumulate-outgoing-args
-#            -mabi=ms )
-#    endif()
-#endif()
+set(SRC_FILES
+        quickjs/cutils.c
+        quickjs/libbf.c
+        quickjs/libregexp.c
+        quickjs/libunicode.c
+        quickjs/quickjs.c
+        src/quickjs-wrap.c
+        )
+if ( ANDROID OR APPLE )
+    list(APPEND SRC_FILES src/v8-impl.cc)
+endif()
 
 file(STRINGS "quickjs/VERSION" QJS_VERSION_STR)
 
@@ -42,15 +43,8 @@ include_directories(
     quickjs
 )
 
-add_library(quickjs STATIC
-        quickjs/cutils.c
-        quickjs/libbf.c
-        quickjs/libregexp.c
-        quickjs/libunicode.c
-        quickjs/quickjs.c
-        src/v8-impl.cc
-        src/quickjs-wrap.c
-        )
+add_library(quickjs STATIC ${SRC_FILES})
+
 #set_target_properties(quickjs PROPERTIES
 #        C_STANDARD 99
 #        C_STANDARD_REQUIRED ON
