@@ -1,9 +1,13 @@
 #include "v8.h"
 #include<cstring>
 
+#if !defined(CONFIG_CHECK_JSVALUE) && defined(JS_NAN_BOXING)
+#define JS_INITVAL(s, t, val) s = JS_MKVAL(t, val)
+#define JS_INITPTR(s, t, p) s = JS_MKPTR(t, p)
+#else
 #define JS_INITVAL(s, t, val) s.tag = t, s.u.int32=val
-
 #define JS_INITPTR(s, t, p) s.tag = t, s.u.ptr = p
+#endif
 
 namespace v8 {
 namespace platform {
