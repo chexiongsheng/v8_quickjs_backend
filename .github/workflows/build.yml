@@ -66,6 +66,7 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
+        find / -name libmingwex.a
     - name: Build
       run: |
         cd win
