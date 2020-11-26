@@ -3,5 +3,4 @@
 
 #include <cstdint>
 
-static const uint8_t SnapshotBlobCode[] = {
-};
+static const uint8_t SnapshotBlobCode[] = {0};
