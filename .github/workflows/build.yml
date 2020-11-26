@@ -103,6 +103,7 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
+        find / -name libmingwex.a
     - name: Prepare
       shell: bash
       run: |
