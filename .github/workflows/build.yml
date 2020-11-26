@@ -67,9 +67,9 @@ jobs:
       run: |
         ./make_win.sh
     - name: Build
-        run: |
-          cd win
-          .\make_win64.bat
+      run: |
+        cd win
+        .\make_win64.bat
     - name: Prepare
       shell: bash
       run: |
