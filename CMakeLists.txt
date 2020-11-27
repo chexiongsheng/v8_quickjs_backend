@@ -43,7 +43,11 @@ include_directories(
     quickjs
 )
 
+if ( ANDROID OR APPLE )
 add_library(quickjs STATIC ${SRC_FILES})
+else()
+add_library(quickjs SHARED ${SRC_FILES})
+endif()
 
 #set_target_properties(quickjs PROPERTIES
 #        C_STANDARD 99

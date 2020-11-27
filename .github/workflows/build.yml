@@ -66,7 +66,6 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
-        cp /mingw64/x86_64-w64-mingw32/lib/libmingwex.a ./libmingwex.a
     - name: Build
       run: |
         cd win
@@ -75,12 +74,13 @@ jobs:
     - name: Merge Libs
       run: |
         cd win
-        LIB.EXE /OUT:quickjs.lib ..\build\libquickjs.a build\Release\v8qjs.lib ..\libmingwex.a
+        LIB.EXE /OUT:quickjs.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
     - name: Prepare
       shell: bash
       run: |
         mkdir -p qjs/Lib/Win64/
-        cp win/quickjs.lib qjs/Lib/Win64/quickjs.lib
+        cp win/quickjs.lib qjs/Lib/Win64/
+        cp build/msys-quickjs.dll qjs/Lib/Win64/
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
@@ -103,12 +103,21 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
-        cp /mingw32/i686-w64-mingw32/lib/libmingwex.a ./libmingwex.a
+    - name: Build
+      run: |
+        cd win
+        .\make_win32.bat
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Merge Libs
+      run: |
+        cd win
+        LIB.EXE /OUT:quickjs.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
     - name: Prepare
       shell: bash
       run: |
         mkdir -p qjs/Lib/Win32/
-        cp build/libquickjs.a qjs/Lib/Win32/quickjs.lib
+        cp build/quickjs.lib qjs/Lib/Win32/
+        cp build/msys-quickjs.dll qjs/Lib/Win32/
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
