@@ -26,6 +26,8 @@ class Context;
 template <class T>
 class MaybeLocal;
 class FunctionTemplate;
+template<typename T>
+class FunctionCallbackInfo;
 
 class V8_EXPORT StartupData {
 public:
@@ -576,6 +578,30 @@ public:
 private:
 };
 
+class V8_EXPORT Function : public Object {
+public:
+};
+
+class V8_EXPORT Template : public Data {
+public:
+};
+
+typedef void (*FunctionCallback)(const FunctionCallbackInfo<Value>& info);
+
+class V8_EXPORT FunctionTemplate : public Template {
+public:
+    static Local<FunctionTemplate> New(
+        Isolate* isolate, FunctionCallback callback = nullptr,
+        Local<Value> data = Local<Value>());
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Function> GetFunction(
+        Local<Context> context);
+
+    int magic_;
+    FunctionCallback callback_;
+    Local<Value> data_;
+};
+
 template<typename T>
 class ReturnValue {
 public:
@@ -654,30 +680,6 @@ public:
     JSValueConst this_;
     Isolate * isolate_;
     int magic_;
-};
-
-class V8_EXPORT Function : public Object {
-public:
-};
-
-class V8_EXPORT Template : public Data {
-public:
-};
-
-typedef void (*FunctionCallback)(const FunctionCallbackInfo<Value>& info);
-
-class V8_EXPORT FunctionTemplate : public Template {
-public:
-    static Local<FunctionTemplate> New(
-        Isolate* isolate, FunctionCallback callback = nullptr,
-        Local<Value> data = Local<Value>());
-    
-    V8_WARN_UNUSED_RESULT MaybeLocal<Function> GetFunction(
-        Local<Context> context);
-
-    int magic_;
-    FunctionCallback callback_;
-    Local<Value> data_;
 };
 
 class ScriptOrigin {
