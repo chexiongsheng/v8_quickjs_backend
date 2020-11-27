@@ -43,10 +43,20 @@ include_directories(
     quickjs
 )
 
-if ( ANDROID OR APPLE )
-add_library(quickjs STATIC ${SRC_FILES})
-else()
+if ( MSYS )
 add_library(quickjs SHARED ${SRC_FILES})
+target_compile_definitions(quickjs PRIVATE
+        _GNU_SOURCE
+        CONFIG_BIGNUM
+        CONFIG_VERSION="\\\"${QJS_VERSION_STR}\\\""
+        )
+else()
+add_library(quickjs STATIC ${SRC_FILES})
+target_compile_definitions(quickjs PRIVATE
+        _GNU_SOURCE
+        CONFIG_BIGNUM
+        CONFIG_VERSION="${QJS_VERSION_STR}"
+        )
 endif()
 
 #set_target_properties(quickjs PROPERTIES
@@ -54,11 +64,6 @@ endif()
 #        C_STANDARD_REQUIRED ON
 #        )
 target_compile_options(quickjs PRIVATE ${qjs_cflags})
-target_compile_definitions(quickjs PRIVATE
-        _GNU_SOURCE
-        CONFIG_BIGNUM
-        CONFIG_VERSION="${QJS_VERSION_STR}"
-        )
 if (CMAKE_BUILD_TYPE MATCHES Debug)
     target_compile_definitions(quickjs PRIVATE
             DUMP_LEAKS
