@@ -243,12 +243,16 @@ Local<FunctionTemplate>& Isolate::GetFunctionTemplate(int index) {
 }
 
 Local<Object> Context::Global() {
-    Object* obj = new Object();
-    obj->u_.value_ = JS_GetGlobalObject(context_);
-    return Local<Object>(obj);
+    if (global_.IsEmpty()) {
+        Object* obj = new Object();
+        obj->u_.value_ = JS_GetGlobalObject(context_);
+        global_ = Local<Object>(obj);
+    }
+    return global_;
 }
 
 Context::~Context() {
+    JS_FreeValue(context_, global_->u_.value_);
     JS_FreeContext(context_);
 }
 

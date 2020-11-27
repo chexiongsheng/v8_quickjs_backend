@@ -447,6 +447,8 @@ public:
     Isolate* const isolate_;
 
     JSContext *context_;
+    
+    Local<Object> global_;
 
     Context(Isolate* isolate);
 };
