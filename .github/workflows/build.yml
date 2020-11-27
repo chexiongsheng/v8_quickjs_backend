@@ -66,6 +66,7 @@ jobs:
     - shell: msys2 {0}
       run: |
         ./make_win.sh
+        ls build
     - name: Build
       run: |
         cd win
