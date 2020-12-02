@@ -974,7 +974,7 @@ int JS_SetModuleExport(JSContext *ctx, JSModuleDef *m, const char *export_name,
 int JS_SetModuleExportList(JSContext *ctx, JSModuleDef *m,
                            const JSCFunctionListEntry *tab, int len);
 
-//wrap
+/*-------begin fuctions for v8 api---------*/
 JSValue JS_NewFloat64_(JSContext *ctx, double d);
 JSValue JS_NewStringLen_(JSContext *ctx, const char *str1, size_t len1);
 JSValue JS_NewInt32_(JSContext *ctx, int32_t val);
@@ -983,6 +983,8 @@ JSValue JS_True();
 JSValue JS_False();
 JSValue JS_Null();
 JSValue JS_Undefined();
+void *JS_GetOpaque3(JSValueConst obj);
+/*-------end fuctions for v8 api---------*/
 
 #undef js_unlikely
 #undef js_force_inline

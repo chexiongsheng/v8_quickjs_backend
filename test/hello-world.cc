@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <iostream>
+#include <map>
+#include <string>
 
 #include "libplatform/libplatform.h"
 #include "v8.h"
@@ -43,6 +45,65 @@ static void Add(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(a + b);
 }
 
+static void Print(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
+
+    std::cout << "js message: " << key << std::endl;
+}
+
+static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& Info)
+{
+    v8::Isolate* Isolate = Info.GetIsolate();
+    v8::Isolate::Scope IsolateScope(Isolate);
+    v8::HandleScope HandleScope(Isolate);
+    v8::Local<v8::Context> Context = Isolate->GetCurrentContext();
+    v8::Context::Scope ContextScope(Context);
+
+    std::map<std::string, std::string>* map = new std::map<std::string, std::string>();
+    Info.This()->SetAlignedPointerInInternalField(0, map);
+}
+
+static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
+
+    auto iter = map->find(key);
+
+    if (iter == map->end()) return;
+
+    const std::string& value = (*iter).second;
+    info.GetReturnValue().Set(
+        v8::String::NewFromUtf8(info.GetIsolate(), value.c_str(),
+            v8::NewStringType::kNormal,
+            static_cast<int>(value.length())).ToLocalChecked());
+}
+
+static void MapSet(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
+    std::string val = *(v8::String::Utf8Value(isolate, info[1]->ToString(context).ToLocalChecked()));
+
+    (*map)[key] = val;
+}
+
+static void MapCount(const v8::FunctionCallbackInfo<v8::Value>& info)
+{
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    info.GetReturnValue().Set((int)map->size());
+}
+
 int main(int argc, char* argv[]) {
     // Initialize V8.
     v8::StartupData SnapshotBlob;
@@ -76,6 +137,18 @@ int main(int argc, char* argv[]) {
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "native_add").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, Add, external)->GetFunction(context).ToLocalChecked())
             .Check();
+
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked(),
+            v8::FunctionTemplate::New(isolate, Print)->GetFunction(context).ToLocalChecked())
+            .Check();
+
+        auto tpl = v8::FunctionTemplate::New(isolate, NewMap);
+        tpl->InstanceTemplate()->SetInternalFieldCount(1);
+        tpl->PrototypeTemplate()->Set(isolate, "get", v8::FunctionTemplate::New(isolate, MapGet));
+        tpl->PrototypeTemplate()->Set(isolate, "set", v8::FunctionTemplate::New(isolate, MapSet));
+        tpl->PrototypeTemplate()->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "count").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapCount));
+
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "map").ToLocalChecked(), tpl->GetFunction(context).ToLocalChecked()).Check();
 
         {
             // Create a string containing the JavaScript source code.
@@ -151,6 +224,31 @@ int main(int argc, char* argv[]) {
             // Convert the result to a uint32 and print it.
             uint32_t number = result->Uint32Value(context).ToChecked();
             printf("native_add(5, 6) = %u\n", number);
+        }
+
+        {
+            const char* csource = R"(
+                let m = new map();
+                print(m.count);
+                m.set('abc', '123');
+                m.set('def', '4567');
+                print(m.count);
+                print(m.get('abc'));
+                print(m.get('def'));
+                print(m.get('fff'));
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            script->Run(context).ToLocalChecked();
         }
     }
 

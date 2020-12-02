@@ -53798,3 +53798,14 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
     JS_AddIntrinsicAtomics(ctx);
 #endif
 }
+
+/*-------begin fuctions for v8 api---------*/
+void *JS_GetOpaque3(JSValueConst obj)
+{
+    JSObject *p;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+        return NULL;
+    p = JS_VALUE_GET_OBJ(obj);
+    return p->u.opaque;
+}
+/*-------end fuctions for v8 api---------*/

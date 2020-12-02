@@ -1,6 +1,16 @@
 #include "v8.h"
 #include<cstring>
 
+enum
+{
+    JS_ATOM_NULL_,
+#define DEF(name, str) JS_ATOM_##name,
+#include "quickjs-atom.h"
+#undef DEF
+    JS_ATOM_END,
+};
+
+
 #if !defined(CONFIG_CHECK_JSVALUE) && defined(JS_NAN_BOXING)
 #define JS_INITVAL(s, t, val) s = JS_MKVAL(t, val)
 #define JS_INITPTR(s, t, p) s = JS_MKPTR(t, p)
@@ -71,8 +81,27 @@ bool Value::IsSymbol() const {
     return jsValue_ && JS_IsSymbol(u_.value_);
 }
 
+void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
+    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(val));
+    if (internalFields) {
+        std::cout << "free internalFields" << std::endl;
+        js_free_rt(rt, internalFields);
+        JS_SetOpaque(val, nullptr);
+    }
+}
+
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
+    
+    JSClassDef cls_def;
+    cls_def.class_name = "__v8_simulate_obj";
+    cls_def.finalizer = V8FinalizerWrap;
+    cls_def.exotic = NULL;
+    cls_def.gc_mark = NULL;
+    cls_def.call = NULL;
+
+    JS_NewClassID(&class_id_);
+    JS_NewClass(runtime_, class_id_, &cls_def);
 };
 
 Isolate::~Isolate() {
@@ -114,6 +143,16 @@ bool Value::IsExternal() const {
     return jsValue_ && JS_VALUE_GET_TAG(u_.value_) == JS_TAG_EXTERNAL;
 }
 
+MaybeLocal<String> Value::ToString(Local<Context> context) const {
+    String * str = new String();
+    if (jsValue_) {
+        str->u_.value_ = JS_ToString(context->context_, u_.value_);
+    } else {
+        str->jsValue_ = false;
+        str->u_ = u_;
+    }
+    return MaybeLocal<String>(Local<String>(str));
+}
 
 MaybeLocal<String> String::NewFromUtf8(
     Isolate* isolate, const char* data,
@@ -256,6 +295,24 @@ Context::~Context() {
     JS_FreeContext(context_);
 }
 
+void Template::Set(Isolate* isolate, const char* name, Local<Data> value) {
+    fields_[name] = value;
+}
+
+    
+void Template::SetAccessorProperty(Local<Name> name,
+                                         Local<FunctionTemplate> getter,
+                                         Local<FunctionTemplate> setter,
+                                         PropertyAttribute attribute) {
+    
+    accessor_property_infos_[name] = {getter, setter, attribute};
+}
+
+void ObjectTemplate::SetInternalFieldCount(int value) {
+    internal_field_count_ = value;
+}
+
+
 Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback callback,
                                               Local<Value> data) {
     Local<FunctionTemplate> functionTemplate(new FunctionTemplate());
@@ -265,7 +322,27 @@ Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback
     return functionTemplate;
 }
 
+Local<ObjectTemplate> FunctionTemplate::InstanceTemplate() {
+    if (instance_template_.IsEmpty()) {
+        instance_template_ = Local<ObjectTemplate>(new ObjectTemplate());
+    }
+    return instance_template_;
+}
+    
+void FunctionTemplate::Inherit(Local<FunctionTemplate> parent) {
+    //TODO:
+}
+    
+Local<ObjectTemplate> FunctionTemplate::PrototypeTemplate() {
+    if (prototype_template_.IsEmpty()) {
+        prototype_template_ = Local<ObjectTemplate>(new ObjectTemplate());
+    }
+    return prototype_template_;
+}
+
 MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
+    //TODO: cache function for context
+    bool isCtor = !prototype_template_.IsEmpty();
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
         Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
         Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
@@ -277,11 +354,37 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         callbackInfo.this_ = this_val;
         callbackInfo.magic_ = magic;
         callbackInfo.value_ = JS_Undefined();
+        callbackInfo.isConstructCall = !functionTemplate->instance_template_.IsEmpty();
+        
+        if (callbackInfo.isConstructCall && functionTemplate->instance_template_->internal_field_count_ > 0) {
+            JSValue proto = JS_GetProperty(ctx, this_val, JS_ATOM_prototype);
+            callbackInfo.this_ = JS_NewObjectProtoClass(ctx, proto, isolate->class_id_);
+            JS_FreeValue(ctx, proto);
+            size_t size = sizeof(InternalFields) + sizeof(void*) * (functionTemplate->InstanceTemplate()->internal_field_count_ - 1);
+            InternalFields* internalFields = (InternalFields*)js_malloc(ctx, size);
+            memset(internalFields, 0, size);
+            internalFields->len_ = functionTemplate->instance_template_->internal_field_count_;
+            JS_SetOpaque(callbackInfo.this_, internalFields);
+        }
         
         functionTemplate->callback_(callbackInfo);
         
-        return callbackInfo.value_;
-    }, "native", 0, JS_CFUNC_generic_magic, magic_);
+        return callbackInfo.isConstructCall ? callbackInfo.this_ : callbackInfo.value_;
+    }, "native", 0, isCtor ? JS_CFUNC_constructor_magic : JS_CFUNC_generic_magic, magic_);
+    
+    if (isCtor) {
+        JSValue proto = JS_NewObject(context->context_);
+        for(auto it : prototype_template_->fields_) {
+            JSAtom atom = JS_NewAtom(context->context_, it.first.data());
+            std::cout << "add " << it.first << std::endl;
+            Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
+            Local<Function> func = funcTpl->GetFunction(context).ToLocalChecked();
+            JS_DefinePropertyValue(context->context_, proto, atom, func->u_.value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
+        }
+        //TODO: 设置静态变量
+        JS_SetConstructor(context->context_, func, proto);
+        JS_FreeValue(context->context_, proto);
+    }
     
     Function* function = new Function();
     function->u_.value_ = func;
@@ -308,6 +411,38 @@ Maybe<bool> Object::Set(Local<Context> context,
     }
     
     return Maybe<bool>(true);
+}
+
+void Object::SetAlignedPointerInInternalField(int index, void* value) {
+    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
+    if (!internalFields || index >= internalFields->len_) {
+        std::cerr << "SetAlignedPointerInInternalField";
+        if (internalFields) {
+            std::cerr << ", index out of range, index = " << index << ", length=" << internalFields->len_ << std::endl;
+        }
+        else {
+            std::cerr << "internalFields is nullptr " << std::endl;
+        }
+            
+        abort();
+    }
+    internalFields->ptrs_[index] = value;
+}
+    
+void* Object::GetAlignedPointerFromInternalField(int index) {
+    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
+    if (!internalFields || index >= internalFields->len_) {
+        std::cerr << "GetAlignedPointerFromInternalField";
+        if (internalFields) {
+            std::cerr << ", index out of range, index = " << index << ", length=" << internalFields->len_ << std::endl;
+        }
+        else {
+            std::cerr << "internalFields is nullptr " << std::endl;
+        }
+            
+        abort();
+    }
+    return internalFields->ptrs_[index];
 }
 
 }  // namespace v8

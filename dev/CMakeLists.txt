@@ -23,6 +23,7 @@ else()
 endif()
 
 set(SRC_FILES
+        include/v8.h
         quickjs/cutils.c
         quickjs/libbf.c
         quickjs/libregexp.c

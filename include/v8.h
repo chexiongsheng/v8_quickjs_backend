@@ -1,4 +1,4 @@
-﻿#ifndef INCLUDE_V8_H_
+#ifndef INCLUDE_V8_H_
 #define INCLUDE_V8_H_
 
 #include <stddef.h>
@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 #include <iostream>
+#include <map>
 
 #include "libplatform/libplatform.h"
 
@@ -28,6 +29,7 @@ class MaybeLocal;
 class FunctionTemplate;
 template<typename T>
 class FunctionCallbackInfo;
+class String;
 
 class V8_EXPORT StartupData {
 public:
@@ -142,14 +144,24 @@ public:
 #endif
         Local<T> result;
         result.val_ = T::Cast(*that);
-        result.counter_ = that.counter_;
-        ++(*(result.counter_));
+        if (result.val_ != nullptr) {
+            result.counter_ = that.counter_;
+            ++(*(result.counter_));
+        }
         return result;
     }
 
     template <class S>
     V8_INLINE Local<S> As() const {
         return Local<S>::Cast(*this);
+    }
+    
+    bool operator==(const Local<T>& that) const {
+        return val_ == that.val_;
+    }
+    
+    bool operator<(const Local<T>& that)  const {
+        return val_ < that.val_;
     }
 
 
@@ -288,7 +300,7 @@ private:
 
 class V8_EXPORT Data {
 public:
-    //virtual ~Data() {}
+    virtual ~Data() {}
     // private:
     //  Data();
 };
@@ -300,6 +312,11 @@ typedef union ValueStore {
         size_t len_;
     } str_;
 } ValueStore;
+
+typedef struct InternalFields {
+    int32_t len_;
+    void* ptrs_[1];
+} InternalFields;
 
 class V8_EXPORT Value : public Data {
 public:
@@ -335,6 +352,9 @@ public:
     bool IsNumber() const;
 
     bool IsExternal() const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(
+        Local<Context> context) const;
 
     ValueStore u_;
     
@@ -351,6 +371,10 @@ class V8_EXPORT Object : public Value {
 public:
     V8_WARN_UNUSED_RESULT Maybe<bool> Set(Local<Context> context,
         Local<Value> key, Local<Value> value);
+    
+    void SetAlignedPointerInInternalField(int index, void* value);
+    
+    void* GetAlignedPointerFromInternalField(int index);
 };
 
 class V8_EXPORT ArrayBuffer : public Object {
@@ -375,7 +399,7 @@ public:
 
     class V8_EXPORT Scope {
     public:
-        explicit V8_INLINE Scope(Isolate* isolate) : isolate_(isolate) { }
+        explicit V8_INLINE Scope(Isolate* isolate) /*: isolate_(isolate) */{ }
 
         V8_INLINE ~Scope() { }
 
@@ -384,7 +408,7 @@ public:
         Scope& operator=(const Scope&) = delete;
 
     private:
-        Isolate* const isolate_;
+        //Isolate* const isolate_;
     };
 
     V8_INLINE static Isolate* New(const CreateParams& params) {
@@ -403,10 +427,9 @@ public:
     
     Local<FunctionTemplate>& GetFunctionTemplate(int index);
 
-private:
-    friend class Context;
-
     JSRuntime *runtime_;
+    
+    JSClassID class_id_;
 
     Local<Context> current_context_;
     
@@ -584,8 +607,44 @@ class V8_EXPORT Function : public Object {
 public:
 };
 
+
+enum PropertyAttribute {
+    /** None. **/
+    None = 0,
+    /** ReadOnly, i.e., not writable. **/
+    ReadOnly = 1 << 0,
+    /** DontEnum, i.e., not enumerable. **/
+    DontEnum = 1 << 1,
+    /** DontDelete, i.e., not configurable. **/
+    DontDelete = 1 << 2
+};
+
 class V8_EXPORT Template : public Data {
 public:
+    void Set(Isolate* isolate, const char* name, Local<Data> value);
+    
+    void SetAccessorProperty(Local<Name> name,
+                             Local<FunctionTemplate> getter = Local<FunctionTemplate>(),
+                             Local<FunctionTemplate> setter = Local<FunctionTemplate>(),
+                             PropertyAttribute attribute = None);
+    
+    std::map<std::string, Local<Data>> fields_;
+    
+    class AccessorPropertyInfo {
+    public:
+        Local<FunctionTemplate> getter_;
+        Local<FunctionTemplate> setter_;
+        PropertyAttribute attribute_;
+    };
+    
+    std::map<Local<Name>, AccessorPropertyInfo> accessor_property_infos_;
+};
+
+class V8_EXPORT ObjectTemplate : public Template {
+public:
+    void SetInternalFieldCount(int value);
+    
+    int internal_field_count_ = 0;
 };
 
 typedef void (*FunctionCallback)(const FunctionCallbackInfo<Value>& info);
@@ -598,10 +657,23 @@ public:
     
     V8_WARN_UNUSED_RESULT MaybeLocal<Function> GetFunction(
         Local<Context> context);
+    
+    Local<ObjectTemplate> InstanceTemplate();
+    
+    void Inherit(Local<FunctionTemplate> parent);
+    
+    Local<ObjectTemplate> PrototypeTemplate();
+    
+    V8_INLINE static FunctionTemplate* Cast(v8::Data* obj) {
+        return dynamic_cast<FunctionTemplate*>(obj);
+    }
 
     int magic_;
     FunctionCallback callback_;
     Local<Value> data_;
+    
+    Local<ObjectTemplate> instance_template_;
+    Local<ObjectTemplate> prototype_template_;
 };
 
 template<typename T>
@@ -658,9 +730,8 @@ public:
         return This();
     }
     
-    //TODO: quickjs有没类似的机制呢？JS_IsConstructor??
     V8_INLINE bool IsConstructCall() const {
-        return true;
+        return isConstructCall;
     }
     
     V8_INLINE Local<Value> Data() const {
@@ -682,6 +753,7 @@ public:
     JSValueConst this_;
     Isolate * isolate_;
     int magic_;
+    bool isConstructCall;
 };
 
 class ScriptOrigin {
@@ -739,7 +811,7 @@ void ReturnValue<T>::Set(const Local<S> handle) {
     } else if (handle->jsValue_) {
         *pvalue_ = handle->u_.value_;
     } else {
-        *pvalue_ = JS_NewStringLen_(context_, handle->u_.str_, handle->u_.len_);
+        *pvalue_ = JS_NewStringLen_(context_, handle->u_.str_.data_, handle->u_.str_.len_);
     }
 }
 
