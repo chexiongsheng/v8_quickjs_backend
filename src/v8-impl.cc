@@ -308,6 +308,72 @@ void Template::SetAccessorProperty(Local<Name> name,
     accessor_property_infos_[name] = {getter, setter, attribute};
 }
 
+void Template::InitPropertys(Local<Context> context, JSValue obj) {
+    for(auto it : fields_) {
+        JSAtom atom = JS_NewAtom(context->context_, it.first.data());
+        Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
+        Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
+        JS_DefinePropertyValue(context->context_, obj, atom, lfunc->u_.value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
+    }
+    
+    for (auto it : accessor_property_infos_) {
+        JSValue getter = JS_Undefined();
+        JSValue setter = JS_Undefined();
+        int flag = JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE;
+        String::Utf8Value name(context->GetIsolate(), it.first);
+        if (!it.second.getter_.IsEmpty()) {
+            flag |= JS_PROP_HAS_GET;
+            JSCFunctionType pfunc;
+            pfunc.getter_magic = [](JSContext *ctx, JSValueConst this_val, int magic) {
+                Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
+                Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
+                FunctionCallbackInfo<Value> callbackInfo;
+                callbackInfo.isolate_ = isolate;
+                callbackInfo.argc_ = 0;
+                callbackInfo.argv_ = nullptr;
+                callbackInfo.context_ = ctx;
+                callbackInfo.this_ = this_val;
+                callbackInfo.magic_ = magic;
+                callbackInfo.value_ = JS_Undefined();
+                callbackInfo.isConstructCall = false;
+                
+                functionTemplate->callback_(callbackInfo);
+                
+                return callbackInfo.value_;
+            };
+            getter = JS_NewCFunction2(context->context_, pfunc.generic, "get", 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);//TODO:名字改为get xxx
+        }
+        if (!it.second.setter_.IsEmpty()) {
+            std::cout << *name << ", has setter" << std::endl;
+            JSCFunctionType pfunc;
+            flag |= JS_PROP_HAS_SET;
+            flag |= JS_PROP_WRITABLE;
+            pfunc.setter_magic = [](JSContext *ctx, JSValueConst this_val, JSValueConst val, int magic) {
+                Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
+                Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
+                FunctionCallbackInfo<Value> callbackInfo;
+                callbackInfo.isolate_ = isolate;
+                callbackInfo.argc_ = 1;
+                callbackInfo.argv_ = &val;
+                callbackInfo.context_ = ctx;
+                callbackInfo.this_ = this_val;
+                callbackInfo.magic_ = magic;
+                callbackInfo.value_ = JS_Undefined();
+                callbackInfo.isConstructCall = false;
+                
+                functionTemplate->callback_(callbackInfo);
+                
+                return callbackInfo.value_;
+            };
+            setter = JS_NewCFunction2(context->context_, pfunc.generic, "set", 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);//TODO:名字改为get xxx
+        }
+        JSAtom atom = JS_NewAtom(context->context_, *name);
+        JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
+        JS_FreeValue(context->context_, getter);
+        JS_FreeValue(context->context_, setter);
+    }
+}
+
 void ObjectTemplate::SetInternalFieldCount(int value) {
     internal_field_count_ = value;
 }
@@ -374,77 +440,8 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     
     if (isCtor) {
         JSValue proto = JS_NewObject(context->context_);
-        for(auto it : prototype_template_->fields_) {
-            JSAtom atom = JS_NewAtom(context->context_, it.first.data());
-            Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
-            Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
-            JS_DefinePropertyValue(context->context_, proto, atom, lfunc->u_.value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
-        }
-        
-        for (auto it : prototype_template_->accessor_property_infos_) {
-            JSValue getter = JS_Undefined();
-            JSValue setter = JS_Undefined();
-            int flag = JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE;
-            String::Utf8Value name(context->GetIsolate(), it.first);
-            if (!it.second.getter_.IsEmpty()) {
-                flag |= JS_PROP_HAS_GET;
-                JSCFunctionType pfunc;
-                pfunc.getter_magic = [](JSContext *ctx, JSValueConst this_val, int magic) {
-                    Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
-                    Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
-                    FunctionCallbackInfo<Value> callbackInfo;
-                    callbackInfo.isolate_ = isolate;
-                    callbackInfo.argc_ = 0;
-                    callbackInfo.argv_ = nullptr;
-                    callbackInfo.context_ = ctx;
-                    callbackInfo.this_ = this_val;
-                    callbackInfo.magic_ = magic;
-                    callbackInfo.value_ = JS_Undefined();
-                    callbackInfo.isConstructCall = false;
-                    
-                    functionTemplate->callback_(callbackInfo);
-                    
-                    return callbackInfo.value_;
-                };
-                getter = JS_NewCFunction2(context->context_, pfunc.generic, "get", 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);//TODO:名字改为get xxx
-            }
-            if (!it.second.setter_.IsEmpty()) {
-                std::cout << *name << ", has setter" << std::endl;
-                JSCFunctionType pfunc;
-                flag |= JS_PROP_HAS_SET;
-                flag |= JS_PROP_WRITABLE;
-                pfunc.setter_magic = [](JSContext *ctx, JSValueConst this_val, JSValueConst val, int magic) {
-                    Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
-                    Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
-                    FunctionCallbackInfo<Value> callbackInfo;
-                    callbackInfo.isolate_ = isolate;
-                    callbackInfo.argc_ = 1;
-                    callbackInfo.argv_ = &val;
-                    callbackInfo.context_ = ctx;
-                    callbackInfo.this_ = this_val;
-                    callbackInfo.magic_ = magic;
-                    callbackInfo.value_ = JS_Undefined();
-                    callbackInfo.isConstructCall = false;
-                    
-                    functionTemplate->callback_(callbackInfo);
-                    
-                    return callbackInfo.value_;
-                };
-                setter = JS_NewCFunction2(context->context_, pfunc.generic, "set", 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);//TODO:名字改为get xxx
-            }
-            JSAtom atom = JS_NewAtom(context->context_, *name);
-            JS_DefineProperty(context->context_, proto, atom, JS_Undefined(), getter, setter, flag);
-            JS_FreeValue(context->context_, getter);
-            JS_FreeValue(context->context_, setter);
-        }
-        
-        //设置静态变量
-        for(auto it : fields_) {
-            JSAtom atom = JS_NewAtom(context->context_, it.first.data());
-            Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
-            Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
-            JS_DefinePropertyValue(context->context_, func, atom, lfunc->u_.value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
-        }
+        prototype_template_->InitPropertys(context, proto);
+        InitPropertys(context, func);
         JS_SetConstructor(context->context_, func, proto);
         JS_FreeValue(context->context_, proto);
     }

@@ -638,6 +638,8 @@ public:
     };
     
     std::map<Local<Name>, AccessorPropertyInfo> accessor_property_infos_;
+    
+    void InitPropertys(Local<Context> context, JSValue obj);
 };
 
 class V8_EXPORT ObjectTemplate : public Template {

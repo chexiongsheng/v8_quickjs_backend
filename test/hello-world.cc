@@ -115,6 +115,24 @@ static void MapStatic(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::cout << "map static, " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }
 
+static void MapStaticPropGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    std::cout << "MapStaticPropGet" << std::endl;
+    
+    info.GetReturnValue().Set(999);
+}
+
+static void MapStaticPropSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    std::cout << "MapStaticPropSet " << info[0]->Int32Value(context).ToChecked() << std::endl;
+}
+
 int main(int argc, char* argv[]) {
     // Initialize V8.
     v8::StartupData SnapshotBlob;
@@ -160,6 +178,8 @@ int main(int argc, char* argv[]) {
         tpl->PrototypeTemplate()->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "count").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapCount),
                                                       v8::FunctionTemplate::New(isolate, MapCountSet));
         tpl->Set(isolate, "static", v8::FunctionTemplate::New(isolate, MapStatic));
+        tpl->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "sprop").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapStaticPropGet),
+                                 v8::FunctionTemplate::New(isolate, MapStaticPropSet));
 
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "map").ToLocalChecked(), tpl->GetFunction(context).ToLocalChecked()).Check();
 
@@ -251,6 +271,8 @@ int main(int argc, char* argv[]) {
                 print(m.get('fff'));
                 m.count = 1000;
                 map.static(1024);
+                print(map.sprop);
+                map.sprop = 888;
               )";
 
             // Create a string containing the JavaScript source code.
