@@ -376,7 +376,6 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         JSValue proto = JS_NewObject(context->context_);
         for(auto it : prototype_template_->fields_) {
             JSAtom atom = JS_NewAtom(context->context_, it.first.data());
-            std::cout << "add " << it.first << std::endl;
             Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
             Local<Function> func = funcTpl->GetFunction(context).ToLocalChecked();
             JS_DefinePropertyValue(context->context_, proto, atom, func->u_.value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
