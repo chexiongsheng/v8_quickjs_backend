@@ -334,7 +334,7 @@ public:
 
     bool IsSymbol() const;
 
-    //bool IsFunction() const;
+    bool IsFunction() const;
     
     //似乎得对quickjs进行一定的改造S
     //V8_INLINE bool IsArrayBuffer() const;

@@ -115,15 +115,9 @@ Context::Context(Isolate* isolate) :isolate_(isolate) {
     JS_SetContextOpaque(context_, isolate);
 }
 
-//TODO: 哪里搞ctx？
-//bool Value::IsFunction() const {
-    //return jsValue_ && JS_IsFunction(<#JSContext *ctx#>, <#JSValue val#>)
-    //if (!jsValue_) return false;
-    //if (JS_VALUE_GET_TAG(u_.value_) != JS_TAG_OBJECT)
-    //    return false;
-    //JSObject *p = JS_VALUE_GET_OBJ(u_.value_);
-    //return p->class_id
-//}
+bool Value::IsFunction() const {
+    return jsValue_ && JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, u_.value_);
+}
 
 bool Value::IsObject() const {
     return jsValue_ && JS_IsObject(u_.value_);
@@ -493,7 +487,7 @@ void Object::SetAlignedPointerInInternalField(int index, void* value) {
 void* Object::GetAlignedPointerFromInternalField(int index) {
     InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
     
-    bool noInternalFields = JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, u_.value_) || internalFields == nullptr;
+    bool noInternalFields = IsFunction() || internalFields == nullptr;
 
     if (noInternalFields || index >= internalFields->len_) {
         std::cerr << "GetAlignedPointerFromInternalField";
