@@ -391,6 +391,8 @@ public:
 
 class V8_EXPORT Isolate {
 public:
+    static Isolate* current_;
+    
     struct CreateParams {
         CreateParams()
             : array_buffer_allocator(nullptr) {}
@@ -399,16 +401,21 @@ public:
 
     class V8_EXPORT Scope {
     public:
-        explicit V8_INLINE Scope(Isolate* isolate) /*: isolate_(isolate) */{ }
+        explicit V8_INLINE Scope(Isolate* isolate) {
+            prev_isolate_ = current_;
+            current_ = isolate;
+        }
 
-        V8_INLINE ~Scope() { }
+        V8_INLINE ~Scope() {
+            current_ = prev_isolate_;
+        }
 
         // Prevent copying of Scope objects.
         Scope(const Scope&) = delete;
         Scope& operator=(const Scope&) = delete;
 
     private:
-        //Isolate* const isolate_;
+        Isolate* prev_isolate_;
     };
 
     V8_INLINE static Isolate* New(const CreateParams& params) {

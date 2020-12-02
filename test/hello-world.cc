@@ -110,7 +110,6 @@ static void MapCountSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
 static void MapStatic(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
-    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
     
     std::cout << "map static, " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }
@@ -118,7 +117,6 @@ static void MapStatic(const v8::FunctionCallbackInfo<v8::Value>& info) {
 static void MapStaticPropGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
-    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
     
     std::cout << "MapStaticPropGet" << std::endl;
     
@@ -128,7 +126,6 @@ static void MapStaticPropGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
 static void MapStaticPropSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
-    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
     
     std::cout << "MapStaticPropSet " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }

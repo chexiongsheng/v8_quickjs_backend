@@ -108,6 +108,8 @@ Isolate::~Isolate() {
     JS_FreeRuntime(runtime_);
 };
 
+Isolate* Isolate::current_ = nullptr;
+
 Context::Context(Isolate* isolate) :isolate_(isolate) {
     context_ = JS_NewContext(isolate->runtime_);
     JS_SetContextOpaque(context_, isolate);
@@ -344,7 +346,6 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
             getter = JS_NewCFunction2(context->context_, pfunc.generic, "get", 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);//TODO:名字改为get xxx
         }
         if (!it.second.setter_.IsEmpty()) {
-            std::cout << *name << ", has setter" << std::endl;
             JSCFunctionType pfunc;
             flag |= JS_PROP_HAS_SET;
             flag |= JS_PROP_WRITABLE;
@@ -365,7 +366,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
                 
                 return callbackInfo.value_;
             };
-            setter = JS_NewCFunction2(context->context_, pfunc.generic, "set", 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);//TODO:名字改为get xxx
+            setter = JS_NewCFunction2(context->context_, pfunc.generic, "set", 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);//TODO:名字改为set xxx
         }
         JSAtom atom = JS_NewAtom(context->context_, *name);
         JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
@@ -491,13 +492,16 @@ void Object::SetAlignedPointerInInternalField(int index, void* value) {
     
 void* Object::GetAlignedPointerFromInternalField(int index) {
     InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
-    if (!internalFields || index >= internalFields->len_) {
+    
+    bool noInternalFields = JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, u_.value_) || internalFields == nullptr;
+
+    if (noInternalFields || index >= internalFields->len_) {
         std::cerr << "GetAlignedPointerFromInternalField";
-        if (internalFields) {
+        if (!noInternalFields) {
             std::cerr << ", index out of range, index = " << index << ", length=" << internalFields->len_ << std::endl;
         }
         else {
-            std::cerr << "internalFields is nullptr " << std::endl;
+            std::cerr << ", internalFields is nullptr " << std::endl;
         }
             
         abort();
