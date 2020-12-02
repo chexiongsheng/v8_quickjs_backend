@@ -45,8 +45,7 @@ static void Add(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(a + b);
 }
 
-static void Print(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
+static void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
@@ -54,8 +53,7 @@ static void Print(const v8::FunctionCallbackInfo<v8::Value>& info)
     std::cout << "js message: " << key << std::endl;
 }
 
-static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& Info)
-{
+static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& Info) {
     v8::Isolate* Isolate = Info.GetIsolate();
     v8::Isolate::Scope IsolateScope(Isolate);
     v8::HandleScope HandleScope(Isolate);
@@ -66,8 +64,7 @@ static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& Info)
     Info.This()->SetAlignedPointerInInternalField(0, map);
 }
 
-static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
+static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
@@ -84,8 +81,7 @@ static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info)
             static_cast<int>(value.length())).ToLocalChecked());
 }
 
-static void MapSet(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
+static void MapSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
@@ -95,13 +91,28 @@ static void MapSet(const v8::FunctionCallbackInfo<v8::Value>& info)
     (*map)[key] = val;
 }
 
-static void MapCount(const v8::FunctionCallbackInfo<v8::Value>& info)
-{
+static void MapCount(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
     
     info.GetReturnValue().Set((int)map->size());
+}
+
+static void MapCountSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    std::cout << "ignore set count, " << info[0]->Int32Value(context).ToChecked() << std::endl;
+}
+
+static void MapStatic(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    std::cout << "map static, " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }
 
 int main(int argc, char* argv[]) {
@@ -146,7 +157,9 @@ int main(int argc, char* argv[]) {
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
         tpl->PrototypeTemplate()->Set(isolate, "get", v8::FunctionTemplate::New(isolate, MapGet));
         tpl->PrototypeTemplate()->Set(isolate, "set", v8::FunctionTemplate::New(isolate, MapSet));
-        tpl->PrototypeTemplate()->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "count").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapCount));
+        tpl->PrototypeTemplate()->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "count").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapCount),
+                                                      v8::FunctionTemplate::New(isolate, MapCountSet));
+        tpl->Set(isolate, "static", v8::FunctionTemplate::New(isolate, MapStatic));
 
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "map").ToLocalChecked(), tpl->GetFunction(context).ToLocalChecked()).Check();
 
@@ -236,6 +249,8 @@ int main(int argc, char* argv[]) {
                 print(m.get('abc'));
                 print(m.get('def'));
                 print(m.get('fff'));
+                m.count = 1000;
+                map.static(1024);
               )";
 
             // Create a string containing the JavaScript source code.
