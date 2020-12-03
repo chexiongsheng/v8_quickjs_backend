@@ -110,6 +110,40 @@ Isolate::~Isolate() {
 
 Isolate* Isolate::current_ = nullptr;
 
+void Isolate::handleException() {
+    JSValue ex = JS_GetException(current_context_->context_);
+    
+    if (!JS_IsUndefined(ex) && !JS_IsNull(ex)) {
+        JSValue msgVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_message);
+        JSValue nameVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_name);
+        JSValue fileNameVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_fileName);
+        JSValue lineNumVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_lineNumber);
+        
+        auto msg = JS_ToCString(current_context_->context_, msgVal);
+        auto name = JS_ToCString(current_context_->context_, nameVal);
+        auto fileName = JS_ToCString(current_context_->context_, fileNameVal);
+        auto lineNum = JS_ToCString(current_context_->context_, lineNumVal);
+        if (JS_IsUndefined(fileNameVal)) {
+            std::cerr << "Uncaught " << name << ":" << msg << std::endl;
+        }
+        else {
+            std::cerr << fileName << ":" << lineNum << ": Uncaught " << name << ":" << msg << std::endl;
+        }
+        
+        JS_FreeCString(current_context_->context_, lineNum);
+        JS_FreeCString(current_context_->context_, fileName);
+        JS_FreeCString(current_context_->context_, name);
+        JS_FreeCString(current_context_->context_, msg);
+        
+        JS_FreeValue(current_context_->context_, lineNumVal);
+        JS_FreeValue(current_context_->context_, fileNameVal);
+        JS_FreeValue(current_context_->context_, nameVal);
+        JS_FreeValue(current_context_->context_, msgVal);
+        
+        JS_FreeValue(current_context_->context_, ex);
+    }
+}
+
 Context::Context(Isolate* isolate) :isolate_(isolate) {
     context_ = JS_NewContext(isolate->runtime_);
     JS_SetContextOpaque(context_, isolate);
@@ -180,9 +214,11 @@ MaybeLocal<Value> Script::Run(Local<Context> context) {
     Context::Scope contextScope(context);
 
     String::Utf8Value source(isolate, source_);
-    auto ret = JS_Eval(context->context_, *source, source.length(), resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked()), JS_EVAL_FLAG_STRICT);
+    const char *filename = resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked());
+    auto ret = JS_Eval(context->context_, *source, source.length(), filename, JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL);
 
     if (JS_IsException(ret)) {
+        isolate->handleException();
         return MaybeLocal<Value>();
     } else {
         Value* val = new Value();

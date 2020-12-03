@@ -284,6 +284,28 @@ int main(int argc, char* argv[]) {
             // Run the script to get the result.
             script->Run(context).ToLocalChecked();
         }
+        
+        //exception
+        {
+            const char* csource = R"(
+                function empty() {
+                }
+                new map111();
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            auto ret = script->Run(context);
+        }
+        
     }
 
     // Dispose the isolate and tear down V8.

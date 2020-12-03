@@ -281,6 +281,10 @@ public:
      * V8 will crash the process.
      */
     V8_INLINE Local<T> ToLocalChecked() {
+        if (IsEmpty()) {
+            std::cerr << "ToLocalChecked, Maybe value is Nothing." << std::endl;
+            abort();
+        }
         return val_;
     }
 
@@ -429,6 +433,8 @@ public:
     V8_INLINE Local<Context> GetCurrentContext() {
         return current_context_;
     }
+    
+    void handleException();
     
     int RegFunctionTemplate(Local<FunctionTemplate> data);
     
