@@ -115,29 +115,25 @@ void Isolate::handleException() {
     
     if (!JS_IsUndefined(ex) && !JS_IsNull(ex)) {
         JSValue msgVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_message);
-        JSValue nameVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_name);
         JSValue fileNameVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_fileName);
         JSValue lineNumVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_lineNumber);
         
-        auto msg = JS_ToCString(current_context_->context_, msgVal);
-        auto name = JS_ToCString(current_context_->context_, nameVal);
+        auto msg = JS_ToCString(current_context_->context_, ex);
         auto fileName = JS_ToCString(current_context_->context_, fileNameVal);
         auto lineNum = JS_ToCString(current_context_->context_, lineNumVal);
         if (JS_IsUndefined(fileNameVal)) {
-            std::cerr << "Uncaught " << name << ":" << msg << std::endl;
+            std::cerr << "Uncaught " << msg << std::endl;
         }
         else {
-            std::cerr << fileName << ":" << lineNum << ": Uncaught " << name << ":" << msg << std::endl;
+            std::cerr << fileName << ":" << lineNum << ": Uncaught " << msg << std::endl;
         }
         
         JS_FreeCString(current_context_->context_, lineNum);
         JS_FreeCString(current_context_->context_, fileName);
-        JS_FreeCString(current_context_->context_, name);
         JS_FreeCString(current_context_->context_, msg);
         
         JS_FreeValue(current_context_->context_, lineNumVal);
         JS_FreeValue(current_context_->context_, fileNameVal);
-        JS_FreeValue(current_context_->context_, nameVal);
         JS_FreeValue(current_context_->context_, msgVal);
         
         JS_FreeValue(current_context_->context_, ex);
