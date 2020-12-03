@@ -288,8 +288,7 @@ int main(int argc, char* argv[]) {
         //exception
         {
             const char* csource = R"(
-                function empty() {
-                }
+                //throw "abc";
                 new map111();
               )";
 
@@ -297,6 +296,8 @@ int main(int argc, char* argv[]) {
             v8::Local<v8::String> source =
                 v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
                 .ToLocalChecked();
+            
+            v8::TryCatch tryCatch(isolate);
 
             // Compile the source code.
             v8::Local<v8::Script> script =
@@ -304,6 +305,19 @@ int main(int argc, char* argv[]) {
 
             // Run the script to get the result.
             auto ret = script->Run(context);
+            
+            if (tryCatch.HasCaught()) {
+                v8::String::Utf8Value info(isolate, tryCatch.Exception());
+                std::cout << "exception catch, info: " << *info << std::endl;
+                auto msg = tryCatch.Message();
+                std::cout << "fileinfo:" << *v8::String::Utf8Value(isolate, msg->GetScriptResourceName()) << ":" << msg->GetLineNumber(context).ToChecked() << std::endl;
+                v8::Local<v8::Value> stackTrace;
+                if (tryCatch.StackTrace(context).ToLocal(&stackTrace) &&
+                    stackTrace->IsString()) {
+                    v8::String::Utf8Value stack(isolate, stackTrace);
+                    std::cout << "--- " << *stack << std::endl;
+                }
+            }
         }
         
     }

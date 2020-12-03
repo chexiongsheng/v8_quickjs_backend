@@ -30,6 +30,7 @@ class FunctionTemplate;
 template<typename T>
 class FunctionCallbackInfo;
 class String;
+class TryCatch;
 
 class V8_EXPORT StartupData {
 public:
@@ -312,7 +313,7 @@ public:
 typedef union ValueStore {
     JSValue value_;
     struct {
-        char* data_;
+        const char* data_;
         size_t len_;
     } str_;
 } ValueStore;
@@ -451,6 +452,8 @@ public:
     Isolate();
 
     ~Isolate();
+    
+    TryCatch *currentTryCatch_ = nullptr;
 };
 
 class V8_EXPORT Context {
@@ -578,12 +581,7 @@ public:
     //    return 0;
     //}
 
-    /*
-    * A zero length string.
-    */
-    //V8_INLINE static Local<String> Empty(Isolate* isolate) {
-    //    return Local<String>(new String());
-    //}
+    static Local<String> Empty(Isolate* isolate);
 
     V8_INLINE static String* Cast(v8::Value* obj) {
         return static_cast<String*>(obj);
@@ -599,7 +597,7 @@ public:
         
         ~Utf8Value();
         
-        char* operator*() { return data_; }
+        //char* operator*() { return data_; }
         const char* operator*() const { return data_; }
         int length() const { return len_; }
 
@@ -608,7 +606,7 @@ public:
         void operator=(const Utf8Value&) = delete;
 
     private:
-        char* data_;
+        const char* data_;
         size_t len_;
         JSContext *context_ = nullptr;
     };
@@ -814,6 +812,59 @@ public:
 private:
     Local<String> source_;
     MaybeLocal<String> resource_name_;
+};
+
+class V8_EXPORT Message {
+public:
+    V8_INLINE Local<Value> GetScriptResourceName() const {
+        auto str = new String();
+        str->u_.str_.data_ = const_cast<char*>(resource_name_.data());
+        str->u_.str_.len_ = resource_name_.length();
+        str->jsValue_ = false;
+        return Local<String>(str);
+    }
+    
+    //TODO: quickjs未提供该信息?
+    V8_INLINE V8_WARN_UNUSED_RESULT Maybe<int> GetLineNumber(Local<Context> context) const {
+        return Maybe<int>(line_number_);
+    }
+    
+    V8_INLINE V8_WARN_UNUSED_RESULT MaybeLocal<String> GetSourceLine(Local<Context> context) const {
+        return String::Empty(context->GetIsolate());
+    }
+    
+    V8_INLINE Maybe<int> GetStartColumn(Local<Context> context) const {
+        return Maybe<int>(0);
+    }
+    
+    std::string resource_name_;
+    
+    int line_number_ = 0;
+};
+
+class V8_EXPORT TryCatch {
+public:
+    explicit TryCatch(Isolate* isolate);
+    
+    ~TryCatch();
+    
+    bool HasCaught() const;
+    
+    Local<Value> Exception() const;
+    
+    Local<v8::Message> Message() const;
+    
+    void handleException();
+    
+    JSValue catched_;
+    
+    Isolate* isolate_;
+    
+    TryCatch* prev_;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> StackTrace(Local<Context> context);
+    
+    std::string stacktrace_;
 };
 
 template <typename T>

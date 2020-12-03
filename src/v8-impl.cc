@@ -111,10 +111,14 @@ Isolate::~Isolate() {
 Isolate* Isolate::current_ = nullptr;
 
 void Isolate::handleException() {
+    if (currentTryCatch_) {
+        currentTryCatch_->handleException();
+        return;
+    }
+    
     JSValue ex = JS_GetException(current_context_->context_);
     
     if (!JS_IsUndefined(ex) && !JS_IsNull(ex)) {
-        JSValue msgVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_message);
         JSValue fileNameVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_fileName);
         JSValue lineNumVal = JS_GetProperty(current_context_->context_, ex, JS_ATOM_lineNumber);
         
@@ -134,7 +138,6 @@ void Isolate::handleException() {
         
         JS_FreeValue(current_context_->context_, lineNumVal);
         JS_FreeValue(current_context_->context_, fileNameVal);
-        JS_FreeValue(current_context_->context_, msgVal);
         
         JS_FreeValue(current_context_->context_, ex);
     }
@@ -189,6 +192,17 @@ MaybeLocal<String> String::NewFromUtf8(
     str->u_.str_.len_ = length > 0 ? length : strlen(data);
     str->jsValue_ = false;
     return Local<String>(str);
+}
+
+Local<String> String::Empty(Isolate* isolate) {
+    static Local<String> _s;
+    if (_s.IsEmpty()) {
+        _s = Local<String>(new String());
+        _s->jsValue_ = false;
+        _s->u_.str_.data_ = "";
+        _s->u_.str_.len_ = 0;
+    }
+    return _s;
 }
 
 //！！如果一个Local<String>用到这个接口了，就不能再传入JS
@@ -286,7 +300,7 @@ String::Utf8Value::Utf8Value(Isolate* isolate, Local<v8::Value> obj) {
     auto context = isolate->GetCurrentContext();
     Local<String> localStr = Local<String>::Cast(obj);
     if (localStr->jsValue_) {
-        data_ = const_cast<char*>(JS_ToCStringLen(context->context_, &len_, localStr->u_.value_));
+        data_ = JS_ToCStringLen(context->context_, &len_, localStr->u_.value_);
         context_ = context->context_;
     } else {
         data_ = localStr->u_.str_.data_;
@@ -533,6 +547,68 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
         abort();
     }
     return internalFields->ptrs_[index];
+}
+
+TryCatch::TryCatch(Isolate* isolate) {
+    isolate_ = isolate;
+    catched_ = JS_Undefined();
+    prev_ = isolate_->currentTryCatch_;
+    isolate_->currentTryCatch_ = this;
+}
+    
+TryCatch::~TryCatch() {
+    isolate_->currentTryCatch_ = prev_;
+    JS_FreeValue(isolate_->current_context_->context_, catched_);
+}
+    
+bool TryCatch::HasCaught() const {
+    return !JS_IsUndefined(catched_) && !JS_IsNull(catched_);
+}
+    
+Local<Value> TryCatch::Exception() const {
+    Local<Value> ret = Local<Value>(new Value());
+    ret->u_.value_ = catched_;
+    return ret;
+}
+
+MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
+    if (stacktrace_.length() == 0) {
+        JSValue stackVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_stack);
+        const char* stack = JS_ToCString(isolate_->current_context_->context_, stackVal);
+        stacktrace_ = stack;
+        JS_FreeCString(isolate_->current_context_->context_, stack);
+    }
+    auto str = new String();
+    str->u_.str_.data_ = const_cast<char*>(stacktrace_.data());
+    str->u_.str_.len_ = stacktrace_.length();
+    str->jsValue_ = false;
+    return MaybeLocal<Value>(Local<String>(str));
+}
+    
+Local<v8::Message> TryCatch::Message() const {
+    JSValue fileNameVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_fileName);
+    JSValue lineNumVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_lineNumber);
+    
+    Local<v8::Message> message(new v8::Message());
+    
+    if (JS_IsUndefined(fileNameVal)) {
+        message->resource_name_ = "<unknow>";
+        message->line_number_ = - 1;
+    } else {
+        const char* fileName = JS_ToCString(isolate_->current_context_->context_, fileNameVal);
+        message->resource_name_ = fileName;
+        JS_FreeCString(isolate_->current_context_->context_, fileName);
+        JS_ToInt32(isolate_->current_context_->context_, &message->line_number_, lineNumVal);
+    }
+    
+    JS_FreeValue(isolate_->current_context_->context_, lineNumVal);
+    JS_FreeValue(isolate_->current_context_->context_, fileNameVal);
+    
+    return message;
+}
+
+void TryCatch::handleException() {
+    catched_ = JS_GetException(isolate_->current_context_->context_);
 }
 
 }  // namespace v8
