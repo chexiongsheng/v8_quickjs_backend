@@ -53,15 +53,26 @@ static void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::cout << "js message: " << key << std::endl;
 }
 
-static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& Info) {
-    v8::Isolate* Isolate = Info.GetIsolate();
-    v8::Isolate::Scope IsolateScope(Isolate);
-    v8::HandleScope HandleScope(Isolate);
-    v8::Local<v8::Context> Context = Isolate->GetCurrentContext();
-    v8::Context::Scope ContextScope(Context);
+static void OnGarbageCollected(const v8::WeakCallbackInfo<v8::Global<v8::Object>>& Data)
+{
+    auto map = static_cast<std::map<std::string, std::string>*>(Data.GetInternalField(0));
+    v8::Global<v8::Object> *self = Data.GetParameter();
+    std::cout << "gc map=" << Data.GetInternalField(0)<< ",v8::Global=" << self << std::endl;
+    std::cout << "map.size=" << map->size() << std::endl;
+    self->Reset();
+    delete map;
+    delete Data.GetParameter();
+}
+
+static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> Context = isolate->GetCurrentContext();
 
     std::map<std::string, std::string>* map = new std::map<std::string, std::string>();
-    Info.This()->SetAlignedPointerInInternalField(0, map);
+    info.This()->SetAlignedPointerInInternalField(0, map);
+    v8::Global<v8::Object> *self = new v8::Global<v8::Object>(isolate, info.This());
+    std::cout << "map=" << map << ",v8::Global=" << self <<  std::endl;
+    (*self).SetWeak<v8::Global<v8::Object>>(self, OnGarbageCollected, v8::WeakCallbackType::kInternalFields);
 }
 
 static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -270,6 +281,7 @@ int main(int argc, char* argv[]) {
                 map.static(1024);
                 print(map.sprop);
                 map.sprop = 888;
+                m = undefined;
               )";
 
             // Create a string containing the JavaScript source code.
@@ -283,6 +295,9 @@ int main(int argc, char* argv[]) {
 
             // Run the script to get the result.
             script->Run(context).ToLocalChecked();
+
+            std::cout << "LowMemoryNotification.." << std::endl;
+            isolate->LowMemoryNotification();
         }
         
         //exception

@@ -67,6 +67,14 @@ public:
         std::cerr << "v8::FromJust, Maybe value is Nothing." << std::endl;
         abort();
     }
+    
+    V8_INLINE static void Check(bool b, const char* msg) {
+        //Utils::ApiCheck(false, "v8::FromJust", "Maybe value is Nothing.");
+        if (!b) {
+            std::cerr << msg << std::endl;
+            abort();
+        }
+    }
 };
 
 //用智能指针实现
@@ -302,7 +310,6 @@ private:
     Local<T> val_;
 };
 
-
 class V8_EXPORT Data {
 public:
     virtual ~Data() {}
@@ -318,8 +325,12 @@ typedef union ValueStore {
     } str_;
 } ValueStore;
 
+typedef void (*WeakCallback)(void* data);
+
 typedef struct InternalFields {
     int32_t len_;
+    WeakCallback callback_;
+    void* parameter_;
     void* ptrs_[1];
 } InternalFields;
 
@@ -380,6 +391,10 @@ public:
     void SetAlignedPointerInInternalField(int index, void* value);
     
     void* GetAlignedPointerFromInternalField(int index);
+    
+    V8_INLINE static Object* Cast(Value* obj) {
+        return dynamic_cast<Object*>(obj);
+    }
 };
 
 class V8_EXPORT ArrayBuffer : public Object {
@@ -434,6 +449,8 @@ public:
     V8_INLINE Local<Context> GetCurrentContext() {
         return current_context_;
     }
+    
+    void LowMemoryNotification();
     
     void handleException();
     
@@ -492,6 +509,86 @@ public:
     Context(Isolate* isolate);
 };
 
+template <typename T>
+class WeakCallbackInfo {
+public:
+    typedef void (*Callback)(const WeakCallbackInfo<T>& data);
+    
+    V8_INLINE Isolate* GetIsolate() const { return Isolate::current_;}
+    
+    V8_INLINE T* GetParameter() const { return reinterpret_cast<T*>(object_udata_.parameter_); }
+    
+    V8_INLINE void* GetInternalField(int index) const {
+        V8::Check(index >= 0 && index < object_udata_.len_, "InternalField out of range!");
+        return object_udata_.ptrs_[index];
+    }
+    
+    InternalFields object_udata_;
+};
+
+enum class WeakCallbackType { kParameter, kInternalFields, kFinalizer };
+
+template <class T> class PersistentBase {
+public:
+    template <typename P>
+    V8_INLINE void SetWeak(P* parameter,
+                           typename WeakCallbackInfo<P>::Callback callback,
+                           WeakCallbackType type) {
+        if (!weak_ && !val_.IsEmpty() && val_->jsValue_) {
+            weak_ = true;
+            InternalFields* object_udata = reinterpret_cast<InternalFields*>(JS_GetOpaque3(val_->u_.value_));
+            if (object_udata) {
+                object_udata->callback_ = reinterpret_cast<WeakCallback>(callback);
+                object_udata->parameter_ = parameter;
+            }
+            JS_FreeValue(isolate_->current_context_->context_, val_->u_.value_);
+        }
+    }
+    
+    V8_INLINE void Reset() {
+        if (!weak_ && !val_.IsEmpty() && val_->jsValue_) {
+            JS_FreeValue(isolate_->current_context_->context_, val_->u_.value_);
+        }
+        isolate_ = nullptr;
+        val_ = Local<T>();
+        weak_ = false;
+    }
+    
+    template <class S>
+    V8_INLINE void Reset(Isolate* isolate, const Local<S>& other) {
+        static_assert(std::is_base_of<T, S>::value, "type check");
+        Reset();
+        isolate_ = isolate;
+        val_ = Local<T>::Cast(other);
+        if (!val_.IsEmpty() && val_->jsValue_) {
+            val_->u_.value_ = JS_DupValue(isolate_->current_context_->context_, val_->u_.value_);
+        }
+        weak_ = false;
+    }
+    
+    Isolate* isolate_ = nullptr;
+    Local<T> val_;
+    bool weak_ = false;
+    
+    V8_INLINE ~PersistentBase() {
+        Reset();
+    }
+};
+
+template <class T>
+class Global : public PersistentBase<T> {
+public:
+    V8_INLINE Global() {}
+    
+    template <class S>
+    V8_INLINE Global(Isolate* isolate, Local<S> that) {
+        static_assert(std::is_base_of<T, S>::value, "type check");
+        PersistentBase<T>::Reset(isolate, that);
+    }
+};
+
+template <class T>
+using UniquePersistent = Global<T>;
 
 class V8_EXPORT External : public Value {
 public:

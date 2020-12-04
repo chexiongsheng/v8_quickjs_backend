@@ -84,7 +84,9 @@ bool Value::IsSymbol() const {
 void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
     InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(val));
     if (internalFields) {
-        std::cout << "free internalFields" << std::endl;
+        if (internalFields->callback_) {
+            internalFields->callback_(internalFields);
+        }
         js_free_rt(rt, internalFields);
         JS_SetOpaque(val, nullptr);
     }
@@ -141,6 +143,11 @@ void Isolate::handleException() {
         
         JS_FreeValue(current_context_->context_, ex);
     }
+}
+
+void Isolate::LowMemoryNotification() {
+    Scope isolate_scope(this);
+    JS_RunGC(runtime_);
 }
 
 Context::Context(Isolate* isolate) :isolate_(isolate) {
