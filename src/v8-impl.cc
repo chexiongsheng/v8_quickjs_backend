@@ -102,6 +102,7 @@ Isolate::Isolate() : current_context_(nullptr) {
     cls_def.gc_mark = NULL;
     cls_def.call = NULL;
 
+    class_id_ = 0;
     JS_NewClassID(&class_id_);
     JS_NewClass(runtime_, class_id_, &cls_def);
 };
