@@ -102,6 +102,8 @@ Isolate::Isolate() : current_context_(nullptr) {
     cls_def.gc_mark = NULL;
     cls_def.call = NULL;
 
+    //大坑，JSClassID是uint32_t，但Object里的class_id类型为uint16_t，JS_NewClass会把class定义放到以uint32_t索引的数组成员
+    //后续如果用这个class_id新建对象，如果class_id大于uint16_t将会被截值，后续释放对象时，会找错class，可能会导致严重后果（不释放，或者调用错误的free）
     class_id_ = 0;
     JS_NewClassID(&class_id_);
     JS_NewClass(runtime_, class_id_, &cls_def);
