@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include <memory>
 #include <string>
@@ -19,6 +20,8 @@
 #include "quickjs-msvc.h"
 
 #define JS_TAG_EXTERNAL (JS_TAG_FLOAT64 + 1)
+#define JS_TAG_CSTRING (JS_TAG_FLOAT64 + 2)
+#define JS_TAG_V8_EMPTY (JS_TAG_FLOAT64 + 3)
 
 namespace v8 {
 class Object;
@@ -37,6 +40,11 @@ public:
     const char* data;
     int raw_size;
 };
+
+typedef struct CString {
+    size_t len;
+    char data[1];
+} CString;
 
 class V8_EXPORT V8 {
 public:
@@ -75,6 +83,10 @@ public:
             abort();
         }
     }
+    
+    static JSValue NewCString(const char* str, size_t len) ;
+    
+    static void FreeCString(JSValue &str);
 };
 
 //用智能指针实现
@@ -317,14 +329,6 @@ public:
     //  Data();
 };
 
-typedef union ValueStore {
-    JSValue value_;
-    struct {
-        const char* data_;
-        size_t len_;
-    } str_;
-} ValueStore;
-
 typedef void (*WeakCallback)(void* data);
 
 typedef struct ObjectUserData {
@@ -334,7 +338,7 @@ typedef struct ObjectUserData {
     void* ptrs_[1];
 } ObjectUserData;
 
-class V8_EXPORT Value : public Data {
+class V8_EXPORT Value {
 public:
     V8_WARN_UNUSED_RESULT Maybe<uint32_t> Uint32Value(Local<Context> context) const ;
     
@@ -371,16 +375,17 @@ public:
     
     V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(
         Local<Context> context) const;
-
-    ValueStore u_;
     
-    bool jsValue_ = true;
+    JSValue value_;
     
-    //virtual ~Value() {
-        //if (context_) {
-        //    JS_FreeValue(context_, value_);
-        //}
-    //}
+    Value() {
+        value_.tag = JS_TAG_V8_EMPTY;
+        value_.u.int32 = 0;
+    }
+    
+    ~Value() {
+        V8::FreeCString(value_);
+    }
 };
 
 class V8_EXPORT Object : public Value {
@@ -393,7 +398,7 @@ public:
     void* GetAlignedPointerFromInternalField(int index);
     
     V8_INLINE static Object* Cast(Value* obj) {
-        return dynamic_cast<Object*>(obj);
+        return static_cast<Object*>(obj);
     }
 };
 
@@ -534,20 +539,20 @@ public:
     V8_INLINE void SetWeak(P* parameter,
                            typename WeakCallbackInfo<P>::Callback callback,
                            WeakCallbackType type) {
-        if (!weak_ && !val_.IsEmpty() && val_->jsValue_) {
+        if (!weak_ && !val_.IsEmpty() && (JS_VALUE_GET_TAG(val_->value_) != JS_TAG_CSTRING)) {
             weak_ = true;
-            ObjectUserData* object_udata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val_->u_.value_));
+            ObjectUserData* object_udata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val_->value_));
             if (object_udata) {
                 object_udata->callback_ = reinterpret_cast<WeakCallback>(callback);
                 object_udata->parameter_ = parameter;
             }
-            JS_FreeValue(isolate_->current_context_->context_, val_->u_.value_);
+            JS_FreeValue(isolate_->current_context_->context_, val_->value_);
         }
     }
     
     V8_INLINE void Reset() {
-        if (!weak_ && !val_.IsEmpty() && val_->jsValue_) {
-            JS_FreeValue(isolate_->current_context_->context_, val_->u_.value_);
+        if (!weak_ && !val_.IsEmpty() && (JS_VALUE_GET_TAG(val_->value_) != JS_TAG_CSTRING)) {
+            JS_FreeValue(isolate_->current_context_->context_, val_->value_);
         }
         isolate_ = nullptr;
         val_ = Local<T>();
@@ -560,8 +565,8 @@ public:
         Reset();
         isolate_ = isolate;
         val_ = Local<T>::Cast(other);
-        if (!val_.IsEmpty() && val_->jsValue_) {
-            val_->u_.value_ = JS_DupValue(isolate_->current_context_->context_, val_->u_.value_);
+        if (!val_.IsEmpty() && (JS_VALUE_GET_TAG(val_->value_) != JS_TAG_CSTRING)) {
+            val_->value_ = JS_DupValue(isolate_->current_context_->context_, val_->value_);
         }
         weak_ = false;
     }
@@ -831,7 +836,7 @@ public:
     
     V8_INLINE Local<Object> This() const {
         Object* obj = new Object();
-        obj->u_.value_ = this_;
+        obj->value_ = this_;
         return Local<Object>(obj);
     }
     
@@ -915,9 +920,7 @@ class V8_EXPORT Message {
 public:
     V8_INLINE Local<Value> GetScriptResourceName() const {
         auto str = new String();
-        str->u_.str_.data_ = const_cast<char*>(resource_name_.data());
-        str->u_.str_.len_ = resource_name_.length();
-        str->jsValue_ = false;
+        str->value_ = V8::NewCString(resource_name_.data(), resource_name_.length());
         return Local<String>(str);
     }
     
@@ -971,10 +974,11 @@ void ReturnValue<T>::Set(const Local<S> handle) {
                 "type check");
     if (V8_UNLIKELY(handle.IsEmpty())) {
         SetUndefined();
-    } else if (handle->jsValue_) {
-        *pvalue_ = handle->u_.value_;
+    } else if (JS_VALUE_GET_TAG(handle->value_) != JS_TAG_CSTRING) {
+        *pvalue_ = handle->value_;
     } else {
-        *pvalue_ = JS_NewStringLen_(context_, handle->u_.str_.data_, handle->u_.str_.len_);
+        CString* cstr = (CString*)JS_VALUE_GET_PTR(handle->value_);
+        *pvalue_ = JS_NewStringLen_(context_, cstr->data, cstr->len);
     }
 }
 
@@ -1032,7 +1036,7 @@ Local<Value> FunctionCallbackInfo<T>::operator[](int i) const {
         jsVal = argv_[i];
     }
     Value* ret = new Value();
-    ret->u_.value_ = jsVal;
+    ret->value_ = jsVal;
     return Local<Value>(ret);
 }
 
