@@ -82,12 +82,12 @@ bool Value::IsSymbol() const {
 }
 
 void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
-    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(val));
-    if (internalFields) {
-        if (internalFields->callback_) {
-            internalFields->callback_(internalFields);
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val));
+    if (objectUdata) {
+        if (objectUdata->callback_) {
+            objectUdata->callback_(objectUdata);
         }
-        js_free_rt(rt, internalFields);
+        js_free_rt(rt, objectUdata);
         JS_SetOpaque(val, nullptr);
     }
 }
@@ -477,11 +477,11 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
             JSValue proto = JS_GetProperty(ctx, this_val, JS_ATOM_prototype);
             callbackInfo.this_ = JS_NewObjectProtoClass(ctx, proto, isolate->class_id_);
             JS_FreeValue(ctx, proto);
-            size_t size = sizeof(InternalFields) + sizeof(void*) * (functionTemplate->InstanceTemplate()->internal_field_count_ - 1);
-            InternalFields* internalFields = (InternalFields*)js_malloc(ctx, size);
-            memset(internalFields, 0, size);
-            internalFields->len_ = functionTemplate->instance_template_->internal_field_count_;
-            JS_SetOpaque(callbackInfo.this_, internalFields);
+            size_t size = sizeof(ObjectUserData) + sizeof(void*) * (functionTemplate->InstanceTemplate()->internal_field_count_ - 1);
+            ObjectUserData* object_udata = (ObjectUserData*)js_malloc(ctx, size);
+            memset(object_udata, 0, size);
+            object_udata->len_ = functionTemplate->instance_template_->internal_field_count_;
+            JS_SetOpaque(callbackInfo.this_, object_udata);
         }
         
         functionTemplate->callback_(callbackInfo);
@@ -525,11 +525,11 @@ Maybe<bool> Object::Set(Local<Context> context,
 }
 
 void Object::SetAlignedPointerInInternalField(int index, void* value) {
-    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
-    if (!internalFields || index >= internalFields->len_) {
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(u_.value_));
+    if (!objectUdata || index >= objectUdata->len_) {
         std::cerr << "SetAlignedPointerInInternalField";
-        if (internalFields) {
-            std::cerr << ", index out of range, index = " << index << ", length=" << internalFields->len_ << std::endl;
+        if (objectUdata) {
+            std::cerr << ", index out of range, index = " << index << ", length=" << objectUdata->len_ << std::endl;
         }
         else {
             std::cerr << "internalFields is nullptr " << std::endl;
@@ -537,18 +537,18 @@ void Object::SetAlignedPointerInInternalField(int index, void* value) {
             
         abort();
     }
-    internalFields->ptrs_[index] = value;
+    objectUdata->ptrs_[index] = value;
 }
     
 void* Object::GetAlignedPointerFromInternalField(int index) {
-    InternalFields* internalFields = reinterpret_cast<InternalFields*>(JS_GetOpaque3(u_.value_));
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(u_.value_));
     
-    bool noInternalFields = IsFunction() || internalFields == nullptr;
+    bool noObjectUdata = IsFunction() || objectUdata == nullptr;
 
-    if (noInternalFields || index >= internalFields->len_) {
+    if (noObjectUdata || index >= objectUdata->len_) {
         std::cerr << "GetAlignedPointerFromInternalField";
-        if (!noInternalFields) {
-            std::cerr << ", index out of range, index = " << index << ", length=" << internalFields->len_ << std::endl;
+        if (!noObjectUdata) {
+            std::cerr << ", index out of range, index = " << index << ", length=" << objectUdata->len_ << std::endl;
         }
         else {
             std::cerr << ", internalFields is nullptr " << std::endl;
@@ -556,7 +556,7 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
             
         abort();
     }
-    return internalFields->ptrs_[index];
+    return objectUdata->ptrs_[index];
 }
 
 TryCatch::TryCatch(Isolate* isolate) {

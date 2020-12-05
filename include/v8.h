@@ -327,12 +327,12 @@ typedef union ValueStore {
 
 typedef void (*WeakCallback)(void* data);
 
-typedef struct InternalFields {
+typedef struct ObjectUserData {
     int32_t len_;
     WeakCallback callback_;
     void* parameter_;
     void* ptrs_[1];
-} InternalFields;
+} ObjectUserData;
 
 class V8_EXPORT Value : public Data {
 public:
@@ -523,7 +523,7 @@ public:
         return object_udata_.ptrs_[index];
     }
     
-    InternalFields object_udata_;
+    ObjectUserData object_udata_;
 };
 
 enum class WeakCallbackType { kParameter, kInternalFields, kFinalizer };
@@ -536,7 +536,7 @@ public:
                            WeakCallbackType type) {
         if (!weak_ && !val_.IsEmpty() && val_->jsValue_) {
             weak_ = true;
-            InternalFields* object_udata = reinterpret_cast<InternalFields*>(JS_GetOpaque3(val_->u_.value_));
+            ObjectUserData* object_udata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val_->u_.value_));
             if (object_udata) {
                 object_udata->callback_ = reinterpret_cast<WeakCallback>(callback);
                 object_udata->parameter_ = parameter;
