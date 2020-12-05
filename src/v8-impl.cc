@@ -49,6 +49,10 @@ void V8::FreeCString(JSValue &str) {
     }
 }
 
+Value::Value() {
+    JS_INITVAL(value_, JS_TAG_V8_EMPTY, 0);
+}
+
 Maybe<uint32_t> Value::Uint32Value(Local<Context> context) const {
     int tag = JS_VALUE_GET_TAG(value_);
     if (tag == JS_TAG_INT) {

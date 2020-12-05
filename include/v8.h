@@ -378,12 +378,9 @@ public:
     
     JSValue value_;
     
-    Value() {
-        value_.tag = JS_TAG_V8_EMPTY;
-        value_.u.int32 = 0;
-    }
+    Value();
     
-    ~Value() {
+    V8_INLINE ~Value() {
         V8::FreeCString(value_);
     }
 };
