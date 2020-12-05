@@ -33,9 +33,9 @@ namespace v8 {
 
 JSValue V8::NewCString(const char* str, size_t len) {
     JSValue ret;
-    CString* cstr = (CString*)std::malloc(sizeof(CString) + len);
+    CString* cstr = (CString*)malloc(sizeof(CString) + len);
     cstr->len = len;
-    std::strncpy(&cstr->data[0], str, len);
+    strncpy(&cstr->data[0], str, len);
     cstr->data[len] = '\0';
     JS_INITPTR(ret, JS_TAG_CSTRING, cstr);
     return ret;
@@ -44,8 +44,8 @@ JSValue V8::NewCString(const char* str, size_t len) {
 void V8::FreeCString(JSValue &str) {
     if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
         CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
-        std::free(cstr);
-        str.u.ptr = nullptr;
+        free(cstr);
+        JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
     }
 }
 
