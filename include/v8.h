@@ -185,24 +185,6 @@ public:
         return val_ < that.val_;
     }
 
-
-    //V8_INLINE static Local<T> New(Isolate* isolate, Local<T> that);
-    //V8_INLINE static Local<T> New(Isolate* isolate,
-    //                              const PersistentBase<T>& that);
-    //V8_INLINE static Local<T> New(Isolate* isolate,
-    //                              const TracedReferenceBase<T>& that);
-
-
-private:
-    friend class Object;
-    friend class Context;
-    friend class String;
-    friend class Isolate;
-    template <class F>
-    friend class MaybeLocal;
-    template <class F>
-    friend class Local;
-
     T* val_;
     int* counter_;
 };
