@@ -34,7 +34,6 @@ namespace v8 {
 JSValue V8::NewCString(const char* str, size_t len) {
     JSValue ret;
     CString* cstr = (CString*)malloc(sizeof(CString) + len);
-    cstr->ref_count = 1;
     cstr->len = len;
     strncpy(&cstr->data[0], str, len);
     cstr->data[len] = '\0';
@@ -42,25 +41,11 @@ JSValue V8::NewCString(const char* str, size_t len) {
     return ret;
 }
 
-JSValue V8::DuplicateCString(JSValue str) {
-    JSValue ret;
-    if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
-        cstr->ref_count++;
-        JS_INITPTR(ret, JS_TAG_CSTRING, cstr);
-    } else {
-        ret = JS_Undefined();
-    }
-    return ret;
-}
-
 void V8::FreeCString(JSValue &str) {
     if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
         CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
-        str = JS_Undefined();
-        if (--(cstr->ref_count) == 0) {
-            free(cstr);
-        }
+        free(cstr);
+        JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
     }
 }
 
@@ -216,11 +201,11 @@ bool Value::IsExternal() const {
 }
 
 MaybeLocal<String> Value::ToString(Local<Context> context) const {
-    String str;
+    String * str = new String();
     if (JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING) {
-        str.value_ = value_;
+        str->value_ = value_;
     } else {
-        str.value_ = JS_ToString(context->context_, value_);
+        str->value_ = JS_ToString(context->context_, value_);
     }
     return MaybeLocal<String>(Local<String>(str));
 }
@@ -228,17 +213,18 @@ MaybeLocal<String> Value::ToString(Local<Context> context) const {
 MaybeLocal<String> String::NewFromUtf8(
     Isolate* isolate, const char* data,
     NewStringType type, int length) {
-    String str;
+    auto str = new String();
     //printf("NewFromUtf8:%p\n", str);
     size_t len = length > 0 ? length : strlen(data);
-    str.value_ = V8::NewCString(data, len);
+    str->value_ = V8::NewCString(data, len);
     return Local<String>(str);
 }
 
 Local<String> String::Empty(Isolate* isolate) {
     static Local<String> _s;
     if (_s.IsEmpty()) {
-        _s = NewFromUtf8(isolate, "").ToLocalChecked();
+        _s = Local<String>(new String());
+        _s->value_ = V8::NewCString("", 0);
     }
     return _s;
 }
@@ -269,8 +255,8 @@ MaybeLocal<Value> Script::Run(Local<Context> context) {
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
-        Value val;
-        val.value_ = ret;
+        Value* val = new Value();
+        val->value_ = ret;
         return MaybeLocal<Value>(Local<Value>(val));
     }
 }
@@ -283,8 +269,8 @@ Script::~Script() {
 }
 
 Local<External> External::New(Isolate* isolate, void* value) {
-    External external;
-    JS_INITPTR(external.value_, JS_TAG_EXTERNAL, value);
+    External* external = new External();
+    JS_INITPTR(external->value_, JS_TAG_EXTERNAL, value);
     return Local<External>(external);
 }
 
@@ -297,14 +283,14 @@ double Number::Value() const {
 }
 
 Local<Number> Number::New(Isolate* isolate, double value) {
-    Number ret;
-    ret.value_ = JS_NewFloat64_(isolate->GetCurrentContext()->context_, value);
+    Number* ret = new Number();
+    ret->value_ = JS_NewFloat64_(isolate->GetCurrentContext()->context_, value);
     return Local<Number>(ret);
 }
 
 Local<Integer> Integer::New(Isolate* isolate, int32_t value) {
-    Integer ret;
-    JS_INITVAL(ret.value_, JS_TAG_INT, value);
+    Integer* ret = new Integer();
+    JS_INITVAL(ret->value_, JS_TAG_INT, value);
     return Local<Integer>(ret);
 }
 
@@ -313,14 +299,14 @@ bool Boolean::Value() const {
 }
 
 Local<Boolean> Boolean::New(Isolate* isolate, bool value) {
-    Boolean ret;
-    JS_INITVAL(ret.value_, JS_TAG_BOOL, (value != 0));
+    Boolean* ret = new Boolean();
+    JS_INITVAL(ret->value_, JS_TAG_BOOL, (value != 0));
     return Local<Boolean>(ret);
 }
 
 Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
-    Integer ret;
-    ret.value_ = JS_NewUint32_(isolate->GetCurrentContext()->context_, value);;
+    Integer* ret = new Integer();
+    ret->value_ = JS_NewUint32_(isolate->GetCurrentContext()->context_, value);;
     return Local<Integer>(ret);
 }
 
@@ -363,8 +349,8 @@ Local<FunctionTemplate>& Isolate::GetFunctionTemplate(int index) {
 
 Local<Object> Context::Global() {
     if (global_.IsEmpty()) {
-        Object obj;
-        obj.value_ = JS_GetGlobalObject(context_);
+        Object* obj = new Object();
+        obj->value_ = JS_GetGlobalObject(context_);
         global_ = Local<Object>(obj);
     }
     return global_;
@@ -525,8 +511,8 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         JS_FreeValue(context->context_, proto);
     }
     
-    Function function;
-    function.value_ = func;
+    Function* function = new Function();
+    function->value_ = func;
     
     return MaybeLocal<Function>(Local<Function>(function));
 }
@@ -606,7 +592,7 @@ bool TryCatch::HasCaught() const {
 }
     
 Local<Value> TryCatch::Exception() const {
-    Local<Value> ret;
+    Local<Value> ret = Local<Value>(new Value());
     ret->value_ = catched_;
     return ret;
 }
@@ -618,7 +604,9 @@ MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
         stacktrace_ = stack;
         JS_FreeCString(isolate_->current_context_->context_, stack);
     }
-    return String::NewFromUtf8(context->GetIsolate(), stacktrace_.data(), NewStringType::kNormal, stacktrace_.length()).ToLocalChecked();
+    auto str = new String();
+    str->value_ = V8::NewCString(stacktrace_.data(), stacktrace_.length());
+    return MaybeLocal<Value>(Local<String>(str));
 }
     
 Local<v8::Message> TryCatch::Message() const {
