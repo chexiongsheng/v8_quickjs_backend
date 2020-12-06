@@ -23,17 +23,25 @@
 #define JS_TAG_CSTRING (JS_TAG_FLOAT64 + 2)
 #define JS_TAG_V8_EMPTY (JS_TAG_FLOAT64 + 3)
 
+#define JS_VALUE_IS_CSTRING(v) (JS_VALUE_GET_TAG(v) == JS_TAG_CSTRING)
+#define JS_VALUE_IS_V8_EMPTY(v) (JS_VALUE_GET_TAG(v) == JS_TAG_V8_EMPTY)
+
 namespace v8 {
 class Object;
 class Isolate;
 class Context;
 template <class T>
 class MaybeLocal;
+class Data;
+class Template;
+class ObjectTemplate;
 class FunctionTemplate;
 template<typename T>
 class FunctionCallbackInfo;
 class String;
 class TryCatch;
+class Script;
+class Message;
 
 class V8_EXPORT StartupData {
 public:
@@ -43,6 +51,7 @@ public:
 
 typedef struct CString {
     size_t len;
+    int ref_count;
     char data[1];
 } CString;
 
@@ -84,7 +93,9 @@ public:
         }
     }
     
-    static JSValue NewCString(const char* str, size_t len) ;
+    static JSValue NewCString(const char* str, size_t len);
+    
+    static JSValue DuplicateCString(JSValue str);
     
     static void FreeCString(JSValue &str);
 };
@@ -93,69 +104,34 @@ public:
 template <class T>
 class Local {
 public:
-    V8_INLINE Local() : val_(nullptr), counter_(nullptr) {}
+    V8_INLINE Local() {}
     template <class S>
     V8_INLINE Local(Local<S> that) {
         static_assert(std::is_base_of<T, S>::value, "type check");
-        val_ = reinterpret_cast<T*>(*that);
-        counter_ = that.counter_;
-        if (val_ != nullptr) {
-            ++(*counter_);
-        }
+        val_ = that.val_;
     }
 
     V8_INLINE Local(const Local<T> &that) {
-        val_ = reinterpret_cast<T*>(*that);
-        counter_ = that.counter_;
-        if (val_ != nullptr) {
-            ++(*counter_);
-        }
+        val_ = that.val_;
     }
 
-    explicit V8_INLINE Local(T* that) {
+    explicit V8_INLINE Local(T that) {
         val_ = that;
-        if (val_ == nullptr) {
-            counter_ = nullptr;
-        }
-        else {
-            counter_ = new int(1);
-        }
     }
 
     Local<T>& operator=(const Local<T>& that) {
-        if (&that == this) {
-            return *this;
-        }
-        Clear();
-        if (that.IsEmpty()) {
-            return *this;
-        }
         val_ = that.val_;
-        counter_ = that.counter_;
-        ++(*counter_);
         return *this;
     }
 
     ~Local() {
-        Clear();
     }
 
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+    V8_INLINE bool IsEmpty() const { return JS_VALUE_IS_V8_EMPTY(val_.value_); }
 
-    V8_INLINE void Clear() {
-        if (val_ == nullptr) return;
-        --(*counter_);
-        if (*counter_ == 0) {
-            delete val_;
-            delete counter_;
-        }
-        val_ = nullptr;
-        counter_ = nullptr;
-    }
+    V8_INLINE T* operator->() const { return const_cast<T*>(&val_); }
 
-    V8_INLINE T* operator->() const { return val_; }
-
-    V8_INLINE T* operator*() const { return val_; }
+    V8_INLINE T* operator*() const { return const_cast<T*>(&val_); }
 
     template <class S> V8_INLINE static Local<T> Cast(Local<S> that) {
 #ifdef V8_ENABLE_CHECKS
@@ -164,11 +140,7 @@ public:
         if (that.IsEmpty()) return Local<T>();
 #endif
         Local<T> result;
-        result.val_ = T::Cast(*that);
-        if (result.val_ != nullptr) {
-            result.counter_ = that.counter_;
-            ++(*(result.counter_));
-        }
+        result.val_ = *T::Cast(*that);
         return result;
     }
 
@@ -178,33 +150,209 @@ public:
     }
     
     bool operator==(const Local<T>& that) const {
-        return val_ == that.val_;
+        return JS_VALUE_GET_PTR(val_.value_) == JS_VALUE_GET_PTR(that.val_.value_);
     }
     
     bool operator<(const Local<T>& that)  const {
-        return val_ < that.val_;
+        return JS_VALUE_GET_PTR(val_.value_) < JS_VALUE_GET_PTR(that.val_.value_);
+    }
+    
+    T val_;
+};
+
+template <>
+class Local<Context> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<Context> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(Context* that) :val_(that) {
+    }
+
+    V8_INLINE Local<Context>& operator=(const Local<Context>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE Context* operator->() const { return val_.get(); }
+
+    V8_INLINE Context* operator*() const { return val_.get(); }
+
+    std::shared_ptr<Context> val_;
+};
+
+template <>
+class Local<Script> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<Script> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(Script* that) : val_(that) {
+    }
+
+    Local<Script>& operator=(const Local<Script>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE Script* operator->() const { return val_.get(); }
+
+    V8_INLINE Script* operator*() const { return val_.get(); }
+
+    std::shared_ptr<Script> val_;
+};
+
+template <>
+class Local<Data> {
+public:
+    V8_INLINE Local(){}
+    
+    template <class S>
+    V8_INLINE Local(Local<S> that) {
+        static_assert(std::is_base_of<Data, S>::value, "type check");
+        val_ = that.val_;
+    }
+    
+    V8_INLINE Local(const Local<Data> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(Data* that) : val_(that) {
+    }
+
+    Local<Data>& operator=(const Local<Data>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE Data* operator->() const { return val_.get(); }
+
+    V8_INLINE Data* operator*() const { return val_.get(); }
+
+    std::shared_ptr<Data> val_;
+};
+
+template <>
+class Local<Template> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<Template> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(Template* that) : val_(that) {
+    }
+
+    Local<Template>& operator=(const Local<Template>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE Template* operator->() const { return val_.get(); }
+
+    V8_INLINE Template* operator*() const { return val_.get(); }
+
+    std::shared_ptr<Template> val_;
+};
+
+template <>
+class Local<ObjectTemplate> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<ObjectTemplate> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(ObjectTemplate* that) : val_(that) {
+    }
+
+    Local<ObjectTemplate>& operator=(const Local<ObjectTemplate>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE ObjectTemplate* operator->() const { return val_.get(); }
+
+    V8_INLINE ObjectTemplate* operator*() const { return val_.get(); }
+
+    std::shared_ptr<ObjectTemplate> val_;
+};
+
+template <>
+class Local<FunctionTemplate> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<FunctionTemplate> &that) {
+        val_ = that.val_;
+    }
+
+    explicit V8_INLINE Local(FunctionTemplate* that) : val_(that) {
+    }
+
+    Local<FunctionTemplate>& operator=(const Local<FunctionTemplate>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE FunctionTemplate* operator->() const { return val_.get(); }
+
+    V8_INLINE FunctionTemplate* operator*() const { return val_.get(); }
+    
+    template <class S> V8_INLINE static Local<FunctionTemplate> Cast(Local<S> that) {
+        Local<FunctionTemplate> result;
+        result.val_ = std::dynamic_pointer_cast<FunctionTemplate>(that.val_);
+        return result;
     }
 
 
-    //V8_INLINE static Local<T> New(Isolate* isolate, Local<T> that);
-    //V8_INLINE static Local<T> New(Isolate* isolate,
-    //                              const PersistentBase<T>& that);
-    //V8_INLINE static Local<T> New(Isolate* isolate,
-    //                              const TracedReferenceBase<T>& that);
+    std::shared_ptr<FunctionTemplate> val_;
+};
 
+template <>
+class Local<Message> {
+public:
+    V8_INLINE Local(){}
+    
+    V8_INLINE Local(const Local<Message> &that) {
+        val_ = that.val_;
+    }
 
-private:
-    friend class Object;
-    friend class Context;
-    friend class String;
-    friend class Isolate;
-    template <class F>
-    friend class MaybeLocal;
-    template <class F>
-    friend class Local;
+    explicit V8_INLINE Local(Message* that) : val_(that) {
+    }
 
-    T* val_;
-    int* counter_;
+    Local<Message>& operator=(const Local<Message>& that) {
+        val_ = that.val_;
+        return *this;
+    }
+
+    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
+
+    V8_INLINE Message* operator->() const { return val_.get(); }
+
+    V8_INLINE Message* operator*() const { return val_.get(); }
+
+    std::shared_ptr<Message> val_;
 };
 
 template <class T>
@@ -278,7 +426,7 @@ private:
 template <class T>
 class MaybeLocal {
 public:
-    V8_INLINE MaybeLocal() : val_(nullptr) {}
+    V8_INLINE MaybeLocal() {}
     template <class S>
     V8_INLINE MaybeLocal(Local<S> that)
         : val_(that) {
@@ -340,6 +488,23 @@ typedef struct ObjectUserData {
 
 class V8_EXPORT Value {
 public:
+    V8_INLINE Value(const Value &that) {
+        init(that);
+    }
+
+    V8_INLINE Value& operator=(const Value& that) {
+        init(that);
+        return *this;
+    }
+    
+    void init(const Value& that) {
+        if (JS_VALUE_IS_CSTRING(that.value_)) {
+            value_ = V8::DuplicateCString(that.value_);
+        } else {
+            value_ = that.value_;
+        }
+    }
+    
     V8_WARN_UNUSED_RESULT Maybe<uint32_t> Uint32Value(Local<Context> context) const ;
     
     V8_WARN_UNUSED_RESULT Maybe<int32_t> Int32Value(Local<Context> context) const;
@@ -831,9 +996,10 @@ public:
     
     V8_INLINE Local<Value> operator[](int i) const;
     
+    //TODO::可以直接强转
     V8_INLINE Local<Object> This() const {
-        Object* obj = new Object();
-        obj->value_ = this_;
+        Object obj;
+        obj.value_ = this_;
         return Local<Object>(obj);
     }
     
@@ -916,8 +1082,8 @@ private:
 class V8_EXPORT Message {
 public:
     V8_INLINE Local<Value> GetScriptResourceName() const {
-        auto str = new String();
-        str->value_ = V8::NewCString(resource_name_.data(), resource_name_.length());
+        String str;
+        str.value_ = V8::NewCString(resource_name_.data(), resource_name_.length());
         return Local<String>(str);
     }
     
@@ -1032,8 +1198,8 @@ Local<Value> FunctionCallbackInfo<T>::operator[](int i) const {
     if (i >=0 && i < argc_) {
         jsVal = argv_[i];
     }
-    Value* ret = new Value();
-    ret->value_ = jsVal;
+    Value ret;
+    ret.value_ = jsVal;
     return Local<Value>(ret);
 }
 
