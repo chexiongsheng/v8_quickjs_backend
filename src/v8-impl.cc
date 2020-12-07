@@ -38,19 +38,18 @@ JSValue V8::NewCString(const char* str, size_t len) {
     strncpy(&cstr->data[0], str, len);
     cstr->data[len] = '\0';
     JS_INITPTR(ret, JS_TAG_CSTRING, cstr);
+
     return ret;
 }
 
 void V8::FreeCString(JSValue &str) {
     if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
         CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
-        free(cstr);
-        JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
+        if (cstr) {
+            free(cstr);
+            JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
+        }
     }
-}
-
-Value::Value() {
-    JS_INITVAL(value_, JS_TAG_V8_EMPTY, 0);
 }
 
 Maybe<uint32_t> Value::Uint32Value(Local<Context> context) const {
@@ -112,6 +111,8 @@ void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
 
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
+    undefined_ = JS_Undefined();
+    empty_string_ = V8::NewCString("", 0);
     
     JSClassDef cls_def;
     cls_def.class_name = "__v8_simulate_obj";
@@ -127,9 +128,40 @@ Isolate::Isolate() : current_context_(nullptr) {
     JS_NewClass(runtime_, class_id_, &cls_def);
 };
 
+Value* Isolate::Undefined() {
+    return reinterpret_cast<Value*>(&undefined_);
+}
+
+String* Isolate::EmptyString() {
+    return reinterpret_cast<String*>(&empty_string_);
+}
+
 Isolate::~Isolate() {
+    for (int i = 0; i < values_.size(); i++) {
+        delete values_[i];
+    }
+    values_.clear();
+    V8::FreeCString(empty_string_);
     JS_FreeRuntime(runtime_);
 };
+
+Value* Isolate::Alloc_() {
+    if (value_alloc_pos_ == values_.size()) {
+        JSValue* node = new JSValue;
+        *node = JS_Undefined();
+        values_.push_back(node);
+    }
+    auto ret = reinterpret_cast<Value*>(values_[value_alloc_pos_++]);
+    return ret;
+}
+
+void Isolate::ReleaseValues(int to_pos) {
+    for (int i = to_pos; i < value_alloc_pos_; i++) {
+        JSValue * to_free = values_[i];
+        V8::FreeCString(*to_free);
+    }
+    value_alloc_pos_ = to_pos;
+}
 
 Isolate* Isolate::current_ = nullptr;
 
@@ -171,11 +203,6 @@ void Isolate::LowMemoryNotification() {
     JS_RunGC(runtime_);
 }
 
-Context::Context(Isolate* isolate) :isolate_(isolate) {
-    context_ = JS_NewContext(isolate->runtime_);
-    JS_SetContextOpaque(context_, isolate);
-}
-
 bool Value::IsFunction() const {
     return JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, value_);
 }
@@ -201,7 +228,7 @@ bool Value::IsExternal() const {
 }
 
 MaybeLocal<String> Value::ToString(Local<Context> context) const {
-    String * str = new String();
+    String * str = context->GetIsolate()->Alloc<String>();
     if (JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING) {
         str->value_ = value_;
     } else {
@@ -213,7 +240,7 @@ MaybeLocal<String> Value::ToString(Local<Context> context) const {
 MaybeLocal<String> String::NewFromUtf8(
     Isolate* isolate, const char* data,
     NewStringType type, int length) {
-    auto str = new String();
+    String *str = isolate->Alloc<String>();
     //printf("NewFromUtf8:%p\n", str);
     size_t len = length > 0 ? length : strlen(data);
     str->value_ = V8::NewCString(data, len);
@@ -221,12 +248,7 @@ MaybeLocal<String> String::NewFromUtf8(
 }
 
 Local<String> String::Empty(Isolate* isolate) {
-    static Local<String> _s;
-    if (_s.IsEmpty()) {
-        _s = Local<String>(new String());
-        _s->value_ = V8::NewCString("", 0);
-    }
-    return _s;
+    return Local<String>(isolate->EmptyString());
 }
 
 //！！如果一个Local<String>用到这个接口了，就不能再传入JS
@@ -243,9 +265,9 @@ MaybeLocal<Script> Script::Compile(
 
 MaybeLocal<Value> Script::Run(Local<Context> context) {
     auto isolate = context->GetIsolate();
-    Isolate::Scope isolateScope(isolate);
-    HandleScope handleScope(isolate);
-    Context::Scope contextScope(context);
+    //Isolate::Scope isolateScope(isolate);
+    //HandleScope handleScope(isolate);
+    //Context::Scope contextScope(context);
 
     String::Utf8Value source(isolate, source_);
     const char *filename = resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked());
@@ -255,7 +277,7 @@ MaybeLocal<Value> Script::Run(Local<Context> context) {
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
-        Value* val = new Value();
+        Value* val = context->GetIsolate()->Alloc<Value>();
         val->value_ = ret;
         return MaybeLocal<Value>(Local<Value>(val));
     }
@@ -269,7 +291,7 @@ Script::~Script() {
 }
 
 Local<External> External::New(Isolate* isolate, void* value) {
-    External* external = new External();
+    External* external = isolate->Alloc<External>();
     JS_INITPTR(external->value_, JS_TAG_EXTERNAL, value);
     return Local<External>(external);
 }
@@ -283,14 +305,20 @@ double Number::Value() const {
 }
 
 Local<Number> Number::New(Isolate* isolate, double value) {
-    Number* ret = new Number();
+    Number* ret = isolate->Alloc<Number>();
     ret->value_ = JS_NewFloat64_(isolate->GetCurrentContext()->context_, value);
     return Local<Number>(ret);
 }
 
 Local<Integer> Integer::New(Isolate* isolate, int32_t value) {
-    Integer* ret = new Integer();
+    Integer* ret = isolate->Alloc<Integer>();
     JS_INITVAL(ret->value_, JS_TAG_INT, value);
+    return Local<Integer>(ret);
+}
+
+Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
+    Integer* ret = isolate->Alloc<Integer>();
+    ret->value_ = JS_NewUint32_(isolate->GetCurrentContext()->context_, value);;
     return Local<Integer>(ret);
 }
 
@@ -299,15 +327,9 @@ bool Boolean::Value() const {
 }
 
 Local<Boolean> Boolean::New(Isolate* isolate, bool value) {
-    Boolean* ret = new Boolean();
+    Boolean* ret = isolate->Alloc<Boolean>();
     JS_INITVAL(ret->value_, JS_TAG_BOOL, (value != 0));
     return Local<Boolean>(ret);
-}
-
-Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
-    Integer* ret = new Integer();
-    ret->value_ = JS_NewUint32_(isolate->GetCurrentContext()->context_, value);;
-    return Local<Integer>(ret);
 }
 
 int64_t Integer::Value() const {
@@ -348,16 +370,19 @@ Local<FunctionTemplate>& Isolate::GetFunctionTemplate(int index) {
 }
 
 Local<Object> Context::Global() {
-    if (global_.IsEmpty()) {
-        Object* obj = new Object();
-        obj->value_ = JS_GetGlobalObject(context_);
-        global_ = Local<Object>(obj);
-    }
-    return global_;
+    Object *g = reinterpret_cast<Object*>(&global_);
+    return Local<Object>(g);
+}
+
+
+Context::Context(Isolate* isolate) :isolate_(isolate) {
+    context_ = JS_NewContext(isolate->runtime_);
+    JS_SetContextOpaque(context_, isolate);
+    global_ = JS_GetGlobalObject(context_);
 }
 
 Context::~Context() {
-    JS_FreeValue(context_, global_->value_);
+    JS_FreeValue(context_, global_);
     JS_FreeContext(context_);
 }
 
@@ -371,7 +396,7 @@ void Template::SetAccessorProperty(Local<Name> name,
                                          Local<FunctionTemplate> setter,
                                          PropertyAttribute attribute) {
     
-    accessor_property_infos_[name] = {getter, setter, attribute};
+    accessor_property_infos_[*String::Utf8Value(Isolate::current_, name)] = {getter, setter, attribute};
 }
 
 void Template::InitPropertys(Local<Context> context, JSValue obj) {
@@ -386,7 +411,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         JSValue getter = JS_Undefined();
         JSValue setter = JS_Undefined();
         int flag = JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE;
-        String::Utf8Value name(context->GetIsolate(), it.first);
+        std::string name = it.first;
         if (!it.second.getter_.IsEmpty()) {
             flag |= JS_PROP_HAS_GET;
             JSCFunctionType pfunc;
@@ -407,7 +432,8 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
                 
                 return callbackInfo.value_;
             };
-            getter = JS_NewCFunction2(context->context_, pfunc.generic, "get", 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);//TODO:名字改为get xxx
+            std::string getter_name = "get " + name;
+            getter = JS_NewCFunction2(context->context_, pfunc.generic, getter_name.c_str(), 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);
         }
         if (!it.second.setter_.IsEmpty()) {
             JSCFunctionType pfunc;
@@ -430,9 +456,10 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
                 
                 return callbackInfo.value_;
             };
-            setter = JS_NewCFunction2(context->context_, pfunc.generic, "set", 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);//TODO:名字改为set xxx
+            std::string setter_name = "set " + name;
+            setter = JS_NewCFunction2(context->context_, pfunc.generic, setter_name.c_str(), 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);
         }
-        JSAtom atom = JS_NewAtom(context->context_, *name);
+        JSAtom atom = JS_NewAtom(context->context_, name.c_str());
         JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
         JS_FreeValue(context->context_, getter);
         JS_FreeValue(context->context_, setter);
@@ -448,7 +475,11 @@ Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback
                                               Local<Value> data) {
     Local<FunctionTemplate> functionTemplate(new FunctionTemplate());
     functionTemplate->callback_ = callback;
-    functionTemplate->data_ = data;
+    if (data.IsEmpty()) {
+        functionTemplate->data_ = JS_Undefined();
+    } else {
+        functionTemplate->data_ = data->value_;
+    }
     functionTemplate->magic_ = isolate->RegFunctionTemplate(functionTemplate);
     return functionTemplate;
 }
@@ -511,7 +542,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         JS_FreeValue(context->context_, proto);
     }
     
-    Function* function = new Function();
+    Function* function = context->GetIsolate()->Alloc<Function>();
     function->value_ = func;
     
     return MaybeLocal<Function>(Local<Function>(function));
@@ -592,9 +623,7 @@ bool TryCatch::HasCaught() const {
 }
     
 Local<Value> TryCatch::Exception() const {
-    Local<Value> ret = Local<Value>(new Value());
-    ret->value_ = catched_;
-    return ret;
+    return Local<Value>(reinterpret_cast<Value*>(const_cast<JSValue*>(&catched_)));
 }
 
 MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
@@ -604,7 +633,7 @@ MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
         stacktrace_ = stack;
         JS_FreeCString(isolate_->current_context_->context_, stack);
     }
-    auto str = new String();
+    auto str = context->GetIsolate()->Alloc<String>();
     str->value_ = V8::NewCString(stacktrace_.data(), stacktrace_.length());
     return MaybeLocal<Value>(Local<String>(str));
 }
