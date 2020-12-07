@@ -111,8 +111,11 @@ void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
 
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
-    undefined_ = JS_Undefined();
-    empty_string_ = V8::NewCString("", 0);
+    literal_values_[kUndefinedValueIndex] = JS_Undefined();
+    literal_values_[kNullValueIndex] = JS_Null();
+    literal_values_[kTrueValueIndex] = JS_True();
+    literal_values_[kFalseValueIndex] = JS_False();
+    literal_values_[kEmptyStringIndex] = V8::NewCString("", 0);
     
     JSClassDef cls_def;
     cls_def.class_name = "__v8_simulate_obj";
@@ -128,20 +131,12 @@ Isolate::Isolate() : current_context_(nullptr) {
     JS_NewClass(runtime_, class_id_, &cls_def);
 };
 
-Value* Isolate::Undefined() {
-    return reinterpret_cast<Value*>(&undefined_);
-}
-
-String* Isolate::EmptyString() {
-    return reinterpret_cast<String*>(&empty_string_);
-}
-
 Isolate::~Isolate() {
     for (int i = 0; i < values_.size(); i++) {
         delete values_[i];
     }
     values_.clear();
-    V8::FreeCString(empty_string_);
+    V8::FreeCString(literal_values_[kEmptyStringIndex]);
     JS_FreeRuntime(runtime_);
 };
 
@@ -248,7 +243,7 @@ MaybeLocal<String> String::NewFromUtf8(
 }
 
 Local<String> String::Empty(Isolate* isolate) {
-    return Local<String>(isolate->EmptyString());
+    return Local<String>(reinterpret_cast<String*>(&isolate->literal_values_[kEmptyStringIndex]));
 }
 
 //！！如果一个Local<String>用到这个接口了，就不能再传入JS

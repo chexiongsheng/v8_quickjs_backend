@@ -42,6 +42,8 @@ class TryCatch;
 class Script;
 class Message;
 class Value;
+class Primitive;
+class Boolean;
 
 class V8_EXPORT StartupData {
 public:
@@ -511,6 +513,14 @@ public:
     };
 };
 
+enum {
+    kUndefinedValueIndex = 0,
+    kNullValueIndex = 1,
+    kTrueValueIndex = 2,
+    kFalseValueIndex = 3,
+    kEmptyStringIndex = 4,
+} LiteralIndex;
+
 class V8_EXPORT Isolate {
 public:
     static Isolate* current_;
@@ -576,9 +586,7 @@ public:
     
     std::vector<JSValue*> values_;
     
-    JSValue undefined_;
-    
-    JSValue empty_string_;
+    JSValue literal_values_[kEmptyStringIndex + 1];
     
     int value_alloc_pos_ = 0;
     
@@ -594,10 +602,29 @@ public:
     
     void ReleaseValues(int to_pos);
     
-    Value* Undefined();
-    
-    String* EmptyString();
+    V8_INLINE Value* Undefined() {
+        return reinterpret_cast<Value*>(&literal_values_[kUndefinedValueIndex]);
+    }
 };
+
+V8_INLINE Local<Primitive> Undefined(Isolate* isolate) {
+    return Local<Primitive>(reinterpret_cast<Primitive*>(&isolate->literal_values_[kUndefinedValueIndex]));
+}
+
+
+V8_INLINE Local<Primitive> Null(Isolate* isolate) {
+    return Local<Primitive>(reinterpret_cast<Primitive*>(&isolate->literal_values_[kNullValueIndex]));
+}
+
+
+V8_INLINE Local<Boolean> True(Isolate* isolate) {
+    return Local<Boolean>(reinterpret_cast<Boolean*>(&isolate->literal_values_[kTrueValueIndex]));
+}
+
+
+V8_INLINE Local<Boolean> False(Isolate* isolate) {
+    return Local<Boolean>(reinterpret_cast<Boolean*>(&isolate->literal_values_[kFalseValueIndex]));
+}
 
 class V8_EXPORT Context : Data {
 public:
