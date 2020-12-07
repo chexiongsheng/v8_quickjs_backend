@@ -186,36 +186,42 @@ public:
     T* val_;
 };
 
-template <>
-class Local<Context> {
+template <class T>
+class LocalSharedPtrImpl {
 public:
-    V8_INLINE Local(){}
+    template <class S>
+    V8_INLINE LocalSharedPtrImpl(Local<S> that) {
+        static_assert(std::is_base_of<T, S>::value, "type check");
+        val_ = that.val_;
+    }
     
-    V8_INLINE Local(const Local<Context> &that) {
+    V8_INLINE LocalSharedPtrImpl(){}
+    
+    V8_INLINE LocalSharedPtrImpl(const Local<T> &that) {
         val_ = that.val_;
     }
 
-    explicit V8_INLINE Local(Context* that) :val_(that) {
+    explicit V8_INLINE LocalSharedPtrImpl(T* that) :val_(that) {
     }
 
-    V8_INLINE Local<Context>& operator=(const Local<Context>& that) {
+    V8_INLINE LocalSharedPtrImpl<T>& operator=(const Local<T>& that) {
         val_ = that.val_;
         return *this;
     }
 
     V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
 
-    V8_INLINE Context* operator->() const { return val_.get(); }
+    V8_INLINE T* operator->() const { return val_.get(); }
 
-    V8_INLINE Context* operator*() const { return val_.get(); }
+    V8_INLINE T* operator*() const { return val_.get(); }
     
-    template <class S> V8_INLINE static Local<Context> Cast(Local<S> that) {
-        Local<Context> result;
-        result.val_ = std::dynamic_pointer_cast<Context>(that.val_);
+    template <class S> V8_INLINE static Local<T> Cast(Local<S> that) {
+        Local<T> result;
+        result.val_ = std::dynamic_pointer_cast<T>(that.val_);
         return result;
     }
 
-    std::shared_ptr<Context> val_;
+    std::shared_ptr<T> val_;
     
     V8_INLINE bool SupportWeak() { return false; }
     
@@ -229,171 +235,76 @@ public:
 };
 
 template <>
-class Local<Script> {
+class Local<Context> : public LocalSharedPtrImpl<Context> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local() : LocalSharedPtrImpl(){}
     
-    V8_INLINE Local(const Local<Script> &that) {
-        val_ = that.val_;
-    }
-
-    explicit V8_INLINE Local(Script* that) : val_(that) {
-    }
-
-    Local<Script>& operator=(const Local<Script>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE Script* operator->() const { return val_.get(); }
-
-    V8_INLINE Script* operator*() const { return val_.get(); }
-
-    std::shared_ptr<Script> val_;
+    V8_INLINE Local(const Local<Context> &that) : LocalSharedPtrImpl(that) { }
+    
+    explicit V8_INLINE Local(Context* that) : LocalSharedPtrImpl(that) {}
 };
 
 template <>
-class Local<Data> {
+class Local<Script> : public LocalSharedPtrImpl<Script> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local() : LocalSharedPtrImpl(){}
+    
+    V8_INLINE Local(const Local<Script> &that) : LocalSharedPtrImpl(that) { }
+    
+    explicit V8_INLINE Local(Script* that) : LocalSharedPtrImpl(that) {}
+};
+
+template <>
+class Local<Data> : public LocalSharedPtrImpl<Data> {
+public:
+    V8_INLINE Local() : LocalSharedPtrImpl(){}
     
     template <class S>
-    V8_INLINE Local(Local<S> that) {
-        static_assert(std::is_base_of<Data, S>::value, "type check");
-        val_ = that.val_;
-    }
+    V8_INLINE Local(Local<S> that) : LocalSharedPtrImpl(that) {}
     
-    V8_INLINE Local(const Local<Data> &that) {
-        val_ = that.val_;
-    }
-
-    explicit V8_INLINE Local(Data* that) : val_(that) {
-    }
-
-    Local<Data>& operator=(const Local<Data>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE Data* operator->() const { return val_.get(); }
-
-    V8_INLINE Data* operator*() const { return val_.get(); }
-
-    std::shared_ptr<Data> val_;
+    V8_INLINE Local(const Local<Data> &that) : LocalSharedPtrImpl(that) { }
+    
+    explicit V8_INLINE Local(Data* that) : LocalSharedPtrImpl(that) {}
 };
 
 template <>
-class Local<Template> {
+class Local<Template> : public LocalSharedPtrImpl<Template> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local() : LocalSharedPtrImpl(){}
     
-    V8_INLINE Local(const Local<Template> &that) {
-        val_ = that.val_;
-    }
-
-    explicit V8_INLINE Local(Template* that) : val_(that) {
-    }
-
-    Local<Template>& operator=(const Local<Template>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE Template* operator->() const { return val_.get(); }
-
-    V8_INLINE Template* operator*() const { return val_.get(); }
-
-    std::shared_ptr<Template> val_;
+    V8_INLINE Local(const Local<Template> &that) : LocalSharedPtrImpl(that) { }
+    
+    explicit V8_INLINE Local(Template* that) : LocalSharedPtrImpl(that) {}
 };
 
 template <>
-class Local<ObjectTemplate> {
+class Local<ObjectTemplate> : public LocalSharedPtrImpl<ObjectTemplate> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local(): LocalSharedPtrImpl(){}
     
-    V8_INLINE Local(const Local<ObjectTemplate> &that) {
-        val_ = that.val_;
-    }
+    V8_INLINE Local(const Local<ObjectTemplate> &that) : LocalSharedPtrImpl(that) { }
 
-    explicit V8_INLINE Local(ObjectTemplate* that) : val_(that) {
-    }
-
-    Local<ObjectTemplate>& operator=(const Local<ObjectTemplate>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE ObjectTemplate* operator->() const { return val_.get(); }
-
-    V8_INLINE ObjectTemplate* operator*() const { return val_.get(); }
-
-    std::shared_ptr<ObjectTemplate> val_;
+    explicit V8_INLINE Local(ObjectTemplate* that) : LocalSharedPtrImpl(that) { }
 };
 
 template <>
-class Local<FunctionTemplate> {
+class Local<FunctionTemplate> : public LocalSharedPtrImpl<FunctionTemplate> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local() : LocalSharedPtrImpl(){}
     
-    V8_INLINE Local(const Local<FunctionTemplate> &that) {
-        val_ = that.val_;
-    }
+    V8_INLINE Local(const Local<FunctionTemplate> &that): LocalSharedPtrImpl(that) { }
 
-    explicit V8_INLINE Local(FunctionTemplate* that) : val_(that) {
-    }
-
-    Local<FunctionTemplate>& operator=(const Local<FunctionTemplate>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE FunctionTemplate* operator->() const { return val_.get(); }
-
-    V8_INLINE FunctionTemplate* operator*() const { return val_.get(); }
-    
-    template <class S> V8_INLINE static Local<FunctionTemplate> Cast(Local<S> that) {
-        Local<FunctionTemplate> result;
-        result.val_ = std::dynamic_pointer_cast<FunctionTemplate>(that.val_);
-        return result;
-    }
-
-    std::shared_ptr<FunctionTemplate> val_;
+    explicit V8_INLINE Local(FunctionTemplate* that) : LocalSharedPtrImpl(that) { }
 };
 
 template <>
-class Local<Message> {
+class Local<Message> : public LocalSharedPtrImpl<Message> {
 public:
-    V8_INLINE Local(){}
+    V8_INLINE Local(): LocalSharedPtrImpl(){}
     
-    V8_INLINE Local(const Local<Message> &that) {
-        val_ = that.val_;
-    }
+    V8_INLINE Local(const Local<Message> &that): LocalSharedPtrImpl(that) { }
 
-    explicit V8_INLINE Local(Message* that) : val_(that) {
-    }
-
-    Local<Message>& operator=(const Local<Message>& that) {
-        val_ = that.val_;
-        return *this;
-    }
-
-    V8_INLINE bool IsEmpty() const { return val_ == nullptr; }
-
-    V8_INLINE Message* operator->() const { return val_.get(); }
-
-    V8_INLINE Message* operator*() const { return val_.get(); }
-
-    std::shared_ptr<Message> val_;
+    explicit V8_INLINE Local(Message* that) : LocalSharedPtrImpl(that) { }
 };
 
 template <class T>
@@ -1127,7 +1038,7 @@ private:
     Isolate* isolate_;
 };
 
-class V8_EXPORT Script {
+class V8_EXPORT Script : Data {
 public:
     static V8_WARN_UNUSED_RESULT MaybeLocal<Script> Compile(
         Local<Context> context, Local<String> source,
@@ -1141,7 +1052,7 @@ private:
     MaybeLocal<String> resource_name_;
 };
 
-class V8_EXPORT Message {
+class V8_EXPORT Message : Data {
 public:
     V8_INLINE Local<Value> GetScriptResourceName() const {
         auto str = Isolate::current_->Alloc<String>();
