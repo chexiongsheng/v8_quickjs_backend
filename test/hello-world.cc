@@ -8,6 +8,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <limits>
 
 #include "libplatform/libplatform.h"
 #include "v8.h"
@@ -48,9 +49,14 @@ static void Add(const v8::FunctionCallbackInfo<v8::Value>& info) {
 static void Print(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
-    std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
-
-    std::cout << "js message: " << key << std::endl;
+    
+    if (info[0]->IsBigInt()) {
+        auto bigint = info[0].As<v8::BigInt>();
+        std::cout << "bigint: " << bigint->Int64Value() << std::endl;
+    } else {
+        std::string key = *(v8::String::Utf8Value(isolate, info[0]->ToString(context).ToLocalChecked()));
+        std::cout << "js message: " << key << std::endl;
+    }
 }
 
 static void OnGarbageCollected(const v8::WeakCallbackInfo<v8::Global<v8::Object>>& Data)
@@ -141,6 +147,25 @@ static void MapStaticPropSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::cout << "MapStaticPropSet " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }
 
+static void GetInt64(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    
+    int32_t t = info[0]->Int32Value(context).ToChecked();
+    v8::Local<v8::Value> ret;
+    if (t == 0) {
+        //std::cout << "std::numeric_limits<int64_t>::max():" << std::numeric_limits<int64_t>::max() << std::endl;
+        ret = v8::BigInt::New(isolate, std::numeric_limits<int64_t>::max());
+    } else if (t == 1) {
+        //std::cout << "std::numeric_limits<int64_t>::min():" << std::numeric_limits<int64_t>::min() << std::endl;
+        ret = v8::BigInt::New(isolate, std::numeric_limits<int64_t>::min());
+    } else {
+        //std::cout << "std::numeric_limits<uint64_t>::max():" << static_cast<int64_t>(std::numeric_limits<uint64_t>::max()) << std::endl;
+        ret = v8::BigInt::NewFromUnsigned(isolate, std::numeric_limits<uint64_t>::max());
+    }
+    info.GetReturnValue().Set(ret);
+}
+
 int main(int argc, char* argv[]) {
     // Initialize V8.
     v8::StartupData SnapshotBlob;
@@ -177,6 +202,10 @@ int main(int argc, char* argv[]) {
 
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, Print)->GetFunction(context).ToLocalChecked())
+            .Check();
+        
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "getbigint").ToLocalChecked(),
+            v8::FunctionTemplate::New(isolate, GetInt64)->GetFunction(context).ToLocalChecked())
             .Check();
 
         auto tpl = v8::FunctionTemplate::New(isolate, NewMap);
@@ -382,6 +411,31 @@ int main(int argc, char* argv[]) {
                 auto ret2 = Func->Call(context, v8::Undefined(isolate), Argv.size(), Argv.data()).ToLocalChecked();
                 std::cout << "ret2 =" << *v8::String::Utf8Value(isolate, ret2) << std::endl;
             }
+        }
+        
+        //bigint
+        {
+            const char* csource = R"(
+                const b0 = getbigint(0);
+                const b1 = getbigint(1);
+                const b2 = getbigint(2);
+                print(typeof b0);
+                print(b0);
+                print(b1);
+                print(b2);
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            script->Run(context).ToLocalChecked();
         }
         
     }

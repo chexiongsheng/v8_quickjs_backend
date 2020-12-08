@@ -800,6 +800,20 @@ public:
     }
 };
 
+class V8_EXPORT BigInt : public Primitive {
+public:
+    static Local<BigInt> New(Isolate* isolate, int64_t value);
+    static Local<BigInt> NewFromUnsigned(Isolate* isolate, uint64_t value);
+    
+    uint64_t Uint64Value(bool* lossless = nullptr) const;
+    
+    int64_t Int64Value(bool* lossless = nullptr) const;
+    
+    V8_INLINE static BigInt* Cast(v8::Value* obj) {
+        return static_cast<BigInt*>(obj);
+    }
+};
+
 class V8_EXPORT Boolean : public Primitive {
 public:
     bool Value() const;

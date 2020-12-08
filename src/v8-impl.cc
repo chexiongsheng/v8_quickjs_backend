@@ -351,6 +351,29 @@ Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
     return Local<Integer>(ret);
 }
 
+
+Local<BigInt> BigInt::New(Isolate* isolate, int64_t value) {
+    BigInt* ret = isolate->Alloc<BigInt>();
+    ret->value_ = JS_NewBigInt64(isolate->current_context_->context_, value);
+    return Local<BigInt>(ret);
+}
+
+Local<BigInt> BigInt::NewFromUnsigned(Isolate* isolate, uint64_t value) {
+    BigInt* ret = isolate->Alloc<BigInt>();
+    ret->value_ = JS_NewBigUint64(isolate->current_context_->context_, value);
+    return Local<BigInt>(ret);
+}
+
+uint64_t BigInt::Uint64Value(bool* lossless) const {
+    return static_cast<uint64_t>(Int64Value(lossless));
+}
+
+int64_t BigInt::Int64Value(bool* lossless) const {
+    int64_t ret;
+    JS_ToBigInt64(Isolate::current_->current_context_->context_, &ret, value_);
+    return ret;
+}
+
 bool Boolean::Value() const {
     return JS_VALUE_GET_BOOL(value_);
 }
