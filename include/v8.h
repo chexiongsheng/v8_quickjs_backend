@@ -888,8 +888,14 @@ private:
 
 class V8_EXPORT Function : public Object {
 public:
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> Call(Local<Context> context,
+                                                 Local<Value> recv, int argc,
+                                                 Local<Value> argv[]);
+    
+    V8_INLINE static Function* Cast(v8::Value* obj) {
+        return static_cast<Function*>(obj);
+    }
 };
-
 
 enum PropertyAttribute {
     /** None. **/
@@ -1068,8 +1074,8 @@ public:
     }
 
     V8_INLINE ~HandleScope() {
-        //isolate_->ReleaseValues(prev_pos_);
         Exit();
+        isolate_->currentHandleScope = prev_scope_;
     }
     
     void Escape(JSValue* val);

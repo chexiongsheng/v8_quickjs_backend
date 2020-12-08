@@ -282,7 +282,18 @@ int main(int argc, char* argv[]) {
                 print(map.sprop);
                 map.sprop = 888;
                 m = undefined;
+                
+                //print(g_map.count);
+                //print(g_map.get('test'));
+                //g_map = undefined;
               )";
+
+            //std::map<std::string, std::string> stack_map;
+            //stack_map["test"] = "ok";
+            //auto stack_map_obj = tpl->InstanceTemplate()->NewInstance(context).ToLocalChecked();
+            //stack_map_obj->SetAlignedPointerInInternalField(0, &stack_map);
+            //context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "g_map").ToLocalChecked(), stack_map_obj).Check();
+
 
             // Create a string containing the JavaScript source code.
             v8::Local<v8::String> source =
@@ -332,6 +343,44 @@ int main(int argc, char* argv[]) {
                     v8::String::Utf8Value stack(isolate, stackTrace);
                     std::cout << "--- " << *stack << std::endl;
                 }
+            }
+        }
+
+        //call js function
+        {
+            const char* csource = R"(
+                function jsfunc(x, y) {
+                    print('jsfunc called, x=' + x + ',y=' + y);
+                    return x + y;
+                }
+                jsfunc;
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            v8::Local<v8::Value> result = script->Run(context).ToLocalChecked();
+            if (result->IsFunction()) {
+                auto Func = result.As<v8::Function>();
+                std::vector<v8::Local<v8::Value>> Argv;
+                Argv.push_back(v8::Number::New(isolate, 1));
+                Argv.push_back(v8::Number::New(isolate, 9));
+                auto ret1 = Func->Call(context, v8::Undefined(isolate), Argv.size(), Argv.data()).ToLocalChecked();
+                std::cout << "ret1 =" << *v8::String::Utf8Value(isolate, ret1) << std::endl;
+
+                Argv.clear();
+                Argv.push_back(v8::String::NewFromUtf8(isolate, "john").ToLocalChecked());
+                Argv.push_back(v8::String::NewFromUtf8(isolate, "che").ToLocalChecked());
+
+                auto ret2 = Func->Call(context, v8::Undefined(isolate), Argv.size(), Argv.data()).ToLocalChecked();
+                std::cout << "ret2 =" << *v8::String::Utf8Value(isolate, ret2) << std::endl;
             }
         }
         

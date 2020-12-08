@@ -290,25 +290,26 @@ MaybeLocal<Script> Script::Compile(
     return MaybeLocal<Script>(Local<Script>(script));
 }
 
-MaybeLocal<Value> Script::Run(Local<Context> context) {
-    auto isolate = context->GetIsolate();
-    //Isolate::Scope isolateScope(isolate);
-    //HandleScope handleScope(isolate);
-    //Context::Scope contextScope(context);
-
-    String::Utf8Value source(isolate, source_);
-    const char *filename = resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked());
-    auto ret = JS_Eval(context->context_, *source, source.length(), filename, JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL);
-
+static V8_INLINE MaybeLocal<Value> ProcessResult(Isolate *isolate, JSValue ret) {
     if (JS_IsException(ret)) {
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
         //脚本执行的返回值由HandleScope接管，这可能有需要GC的对象
-        Value* val = context->GetIsolate()->Alloc<Value>();
+        Value* val = isolate->Alloc<Value>();
         val->value_ = ret;
         return MaybeLocal<Value>(Local<Value>(val));
     }
+}
+
+MaybeLocal<Value> Script::Run(Local<Context> context) {
+    auto isolate = context->GetIsolate();
+
+    String::Utf8Value source(isolate, source_);
+    const char *filename = resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked());
+    auto ret = JS_Eval(context->context_, *source, source.length(), filename, JS_EVAL_FLAG_STRICT | JS_EVAL_TYPE_GLOBAL);
+
+    return ProcessResult(isolate, ret);
 }
 
 Script::~Script() {
@@ -412,6 +413,26 @@ Context::Context(Isolate* isolate) :isolate_(isolate) {
 Context::~Context() {
     JS_FreeValue(context_, global_);
     JS_FreeContext(context_);
+}
+
+MaybeLocal<Value> Function::Call(Local<Context> context,
+                             Local<Value> recv, int argc,
+                             Local<Value> argv[]) {
+    Isolate *isolate = context->GetIsolate();
+    JSValue *js_this = reinterpret_cast<JSValue*>(recv.IsEmpty() ? isolate->Undefined() : (*recv));
+    JSValue *js_argv = (JSValue*)alloca(argc * sizeof(JSValue));
+    for(int i = 0 ; i < argc; i++) {
+        isolate->Escape(*argv[i]);
+        if (JS_VALUE_IS_CSTRING(argv[i]->value_)) {
+            CString *cstr = (CString *)JS_VALUE_GET_PTR(argv[i]->value_);
+            js_argv[i] = JS_NewStringLen(context->context_, cstr->data, cstr->len);
+        } else {
+            js_argv[i] = argv[i]->value_;
+        }
+    }
+    JSValue ret = JS_Call(context->context_, value_, *js_this, argc, js_argv);
+    
+    return ProcessResult(isolate, ret);
 }
 
 void Template::Set(Isolate* isolate, const char* name, Local<Data> value) {
