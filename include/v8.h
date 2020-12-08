@@ -14,6 +14,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <functional>
 
 #include "libplatform/libplatform.h"
 
