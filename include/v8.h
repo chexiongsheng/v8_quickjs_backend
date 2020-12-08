@@ -13,6 +13,7 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include <set>
 
 #include "libplatform/libplatform.h"
 
@@ -44,6 +45,7 @@ class Message;
 class Value;
 class Primitive;
 class Boolean;
+class HandleScope;
 
 class V8_EXPORT StartupData {
 public:
@@ -103,7 +105,7 @@ void IncRef_(Isolate * isolate, JSValue val);
 
 void DecRef_(Isolate * isolate, JSValue val);
 
-void CopyValue_(Value * des, Value* src);
+void SetGlobal_(Isolate * isolate, Value * des, Value* src);
 
 template <class T>
 class Local {
@@ -180,8 +182,8 @@ public:
         DecRef_(isolate, val_->value_);
     }
     
-    V8_INLINE void SetGlobal(Value *val) {
-        CopyValue_(val, val_);
+    V8_INLINE void SetGlobal(Isolate * isolate, Value *val) {
+        SetGlobal_(isolate, val, val_);
         val_ = static_cast<T*>(val);
     }
 
@@ -483,10 +485,6 @@ public:
     Value() = delete;
 };
 
-V8_INLINE void CopyValue_(Value * des, Value* src) {
-    des->value_ = src ->value_;
-}
-
 class V8_EXPORT Object : public Value {
 public:
     V8_WARN_UNUSED_RESULT Maybe<bool> Set(Local<Context> context,
@@ -590,6 +588,8 @@ public:
     
     int value_alloc_pos_ = 0;
     
+    HandleScope *currentHandleScope = nullptr;
+    
     template<class F> F* Alloc() {
         return static_cast<F*>(Alloc_());
     }
@@ -600,7 +600,13 @@ public:
         return value_alloc_pos_;
     }
     
-    void ReleaseValues(int to_pos);
+    void ForeachAllocValue(int start, int end, std::function<void(JSValue*, int)>);
+    
+    V8_INLINE void Escape(Value* val) {
+        Escape(reinterpret_cast<JSValue*>(val));
+    }
+    
+    void Escape(JSValue* val);
     
     V8_INLINE Value* Undefined() {
         return reinterpret_cast<Value*>(&literal_values_[kUndefinedValueIndex]);
@@ -670,6 +676,11 @@ V8_INLINE void DecRef_(Isolate * isolate, JSValue val) {
     JS_FreeValue(isolate->current_context_->context_, val);
 }
 
+
+V8_INLINE void SetGlobal_(Isolate * isolate, Value * des, Value* src) {
+    des->value_ = src ->value_;
+}
+
 template <typename T>
 class WeakCallbackInfo {
 public:
@@ -721,7 +732,7 @@ public:
         Reset();
         isolate_ = isolate;
         val_ = Local<T>::Cast(other);
-        val_.SetGlobal(reinterpret_cast<Value*>(&store_));
+        val_.SetGlobal(isolate, reinterpret_cast<Value*>(&store_));
         if (!val_.IsEmpty() && val_.SupportWeak()) {
             val_.IncRef(isolate_);
         }
@@ -977,8 +988,10 @@ public:
     template <typename S>
     V8_INLINE void Set(S* whatever);
     
-    V8_INLINE ReturnValue(JSContext* context, JSValue* pvalue)
-       :context_(context), pvalue_(pvalue) { }
+    V8_INLINE ReturnValue(Isolate * isolate, JSContext* context, JSValue* pvalue)
+       :isolate_(isolate), context_(context), pvalue_(pvalue) { }
+    
+    Isolate * isolate_;
     
     JSContext* context_;
     
@@ -1016,7 +1029,7 @@ public:
     }
     
     V8_INLINE ReturnValue<T> GetReturnValue() const {
-        return ReturnValue<T>(context_, const_cast<JSValue*>(&value_));
+        return ReturnValue<T>(isolate_, context_, const_cast<JSValue*>(&value_));
     }
 
     int argc_;
@@ -1048,11 +1061,19 @@ public:
     V8_INLINE explicit HandleScope(Isolate* isolate) {
         isolate_ = isolate;
         prev_pos_ = isolate->GetAllocPos();
+        
+        prev_scope_ = isolate->currentHandleScope;
+        isolate->currentHandleScope = this;
     }
 
     V8_INLINE ~HandleScope() {
-        isolate_->ReleaseValues(prev_pos_);
+        //isolate_->ReleaseValues(prev_pos_);
+        Exit();
     }
+    
+    void Escape(JSValue* val);
+    
+    void Exit();
 
 private:
     void* operator new(size_t size);
@@ -1061,8 +1082,10 @@ private:
     void operator delete[](void*, size_t);
     
     int prev_pos_;
-    
     Isolate* isolate_;
+    HandleScope* prev_scope_;
+    
+    std::set<JSValue*> escapes_;
 };
 
 class V8_EXPORT Script : Data {
@@ -1138,6 +1161,8 @@ void ReturnValue<T>::Set(const Local<S> handle) {
     if (V8_UNLIKELY(handle.IsEmpty())) {
         SetUndefined();
     } else if (JS_VALUE_GET_TAG(handle->value_) != JS_TAG_CSTRING) {
+        //如果向js返回了一个数据，这个数据应该Escape
+        isolate_->Escape(*handle);
         *pvalue_ = handle->value_;
     } else {
         CString* cstr = (CString*)JS_VALUE_GET_PTR(handle->value_);

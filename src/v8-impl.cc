@@ -46,6 +46,7 @@ void V8::FreeCString(JSValue &str) {
     if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
         CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
         if (cstr) {
+            //std::cout << "free ---->" << cstr->data << std::endl;
             free(cstr);
             JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
         }
@@ -150,12 +151,17 @@ Value* Isolate::Alloc_() {
     return ret;
 }
 
-void Isolate::ReleaseValues(int to_pos) {
-    for (int i = to_pos; i < value_alloc_pos_; i++) {
-        JSValue * to_free = values_[i];
-        V8::FreeCString(*to_free);
+void Isolate::ForeachAllocValue(int start, int end, std::function<void(JSValue*, int)> callback) {
+    for (int i = std::min(end, value_alloc_pos_) ; i > std::max(0, start); i--) {
+        int idx = i - 1;
+        JSValue * to_free = values_[idx];
+        callback(to_free, idx);
     }
-    value_alloc_pos_ = to_pos;
+}
+
+void Isolate::Escape(JSValue* val) {
+    V8::Check(currentHandleScope, "try to escape a scope, but no scope register!");
+    currentHandleScope->Escape(val);
 }
 
 Isolate* Isolate::current_ = nullptr;
@@ -198,6 +204,30 @@ void Isolate::LowMemoryNotification() {
     JS_RunGC(runtime_);
 }
 
+void HandleScope::Escape(JSValue* val) {
+    escapes_.insert(val);
+}
+
+void HandleScope::Exit() {
+    if(prev_pos_ < isolate_->value_alloc_pos_) {
+        //std::cout << "---------------- start HandleScope::Exit -------------------" << std::endl;
+        //std::cout << prev_pos_ << "," << isolate_->value_alloc_pos_ << std::endl;
+        isolate_->ForeachAllocValue(prev_pos_, isolate_->value_alloc_pos_, [this](JSValue* val, int idx){
+            V8::FreeCString(*val);
+            if (JS_VALUE_HAS_REF_COUNT(*val)) {
+                if (this->escapes_.find(val) == this->escapes_.end()) { //not excaped
+                    //std::cout << "free val type:" << JS_VALUE_GET_TAG(*val) << "," << val << ", idx:" << idx << std::endl;
+                    JS_FreeValueRT(isolate_->runtime_, *val);
+                //} else {
+                    //std::cout << "escaped val type:" << JS_VALUE_GET_TAG(*val) << "," << val << std::endl;
+                }
+            }
+        });
+        isolate_->value_alloc_pos_ = prev_pos_;
+        //std::cout << "---------------- end HandleScope::Exit -------------------" << std::endl;
+    }
+}
+
 bool Value::IsFunction() const {
     return JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, value_);
 }
@@ -223,13 +253,15 @@ bool Value::IsExternal() const {
 }
 
 MaybeLocal<String> Value::ToString(Local<Context> context) const {
-    String * str = context->GetIsolate()->Alloc<String>();
-    if (JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING) {
-        str->value_ = value_;
+    if (JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING || JS_IsString(value_)) {
+        return MaybeLocal<String>(Local<String>(static_cast<String*>(const_cast<Value*>(this))));
     } else {
+        //由HandleScope跟踪回收
+        String * str = context->GetIsolate()->Alloc<String>();
         str->value_ = JS_ToString(context->context_, value_);
+        return MaybeLocal<String>(Local<String>(str));
     }
-    return MaybeLocal<String>(Local<String>(str));
+    
 }
 
 MaybeLocal<String> String::NewFromUtf8(
@@ -272,6 +304,7 @@ MaybeLocal<Value> Script::Run(Local<Context> context) {
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
+        //脚本执行的返回值由HandleScope接管，这可能有需要GC的对象
         Value* val = context->GetIsolate()->Alloc<Value>();
         val->value_ = ret;
         return MaybeLocal<Value>(Local<Value>(val));
@@ -399,6 +432,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         JSAtom atom = JS_NewAtom(context->context_, it.first.data());
         Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
         Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
+        context->GetIsolate()->Escape(*lfunc);
         JS_DefinePropertyValue(context->context_, obj, atom, lfunc->value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
     }
     
@@ -562,6 +596,8 @@ Maybe<bool> Object::Set(Local<Context> context,
             JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), jsValue);
         }
     }
+    
+    context->GetIsolate()->Escape(*value);
     
     return Maybe<bool>(true);
 }
