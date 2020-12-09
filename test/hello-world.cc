@@ -488,10 +488,10 @@ int main(int argc, char* argv[]) {
         
         //date
         {
-            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked(), v8::Date::New(context, 9999.99).ToLocalChecked()).Check();
+            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked(), v8::Date::New(context, 999999999999.99).ToLocalChecked()).Check();
             const char* csource = R"(
                 print(gdate);
-                new Date('1997-7-1T00:00:00');
+                new Date();
               )";
 
             // Create a string containing the JavaScript source code.

@@ -404,7 +404,7 @@ MaybeLocal<Value> Date::New(Local<Context> context, double time) {
 }
     
 double Date::ValueOf() const {
-    JS_GetDate(Isolate::current_->current_context_->context_, value_);
+    return JS_GetDate(Isolate::current_->current_context_->context_, value_);
 }
 
 static std::vector<uint8_t> dummybuffer;

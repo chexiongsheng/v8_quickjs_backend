@@ -53898,7 +53898,7 @@ JS_BOOL JS_IsDate(JSValueConst obj)
 double JS_GetDate(JSContext *ctx, JSValueConst obj)
 {
     double v;
-    if (!JS_ThisTimeValue(ctx, &v, obj))
+    if (JS_ThisTimeValue(ctx, &v, obj))
     {
         v = JS_FLOAT64_NAN;
     }
