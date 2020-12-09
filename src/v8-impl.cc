@@ -31,28 +31,6 @@ std::unique_ptr<v8::Platform> NewDefaultPlatform() {
 
 namespace v8 {
 
-JSValue V8::NewCString(const char* str, size_t len) {
-    JSValue ret;
-    CString* cstr = (CString*)malloc(sizeof(CString) + len);
-    cstr->len = len;
-    strncpy(&cstr->data[0], str, len);
-    cstr->data[len] = '\0';
-    JS_INITPTR(ret, JS_TAG_CSTRING, cstr);
-
-    return ret;
-}
-
-void V8::FreeCString(JSValue &str) {
-    if (JS_VALUE_GET_TAG(str) == JS_TAG_CSTRING) {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(str);
-        if (cstr) {
-            //std::cout << "free ---->" << cstr->data << std::endl;
-            free(cstr);
-            JS_INITPTR(str, JS_TAG_CSTRING, nullptr);
-        }
-    }
-}
-
 Maybe<uint32_t> Value::Uint32Value(Local<Context> context) const {
     int tag = JS_VALUE_GET_TAG(value_);
     if (tag == JS_TAG_INT) {
@@ -92,7 +70,7 @@ bool Value::IsNullOrUndefined() const {
 }
 
 bool Value::IsString() const {
-    return JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING || JS_IsString(value_);
+    return JS_IsString(value_);
 }
 
 bool Value::IsSymbol() const {
@@ -116,7 +94,7 @@ Isolate::Isolate() : current_context_(nullptr) {
     literal_values_[kNullValueIndex] = JS_Null();
     literal_values_[kTrueValueIndex] = JS_True();
     literal_values_[kFalseValueIndex] = JS_False();
-    literal_values_[kEmptyStringIndex] = V8::NewCString("", 0);
+    literal_values_[kEmptyStringIndex] = JS_Undefined();
     
     JSClassDef cls_def;
     cls_def.class_name = "__v8_simulate_obj";
@@ -137,7 +115,7 @@ Isolate::~Isolate() {
         delete values_[i];
     }
     values_.clear();
-    V8::FreeCString(literal_values_[kEmptyStringIndex]);
+    JS_FreeValueRT(runtime_, literal_values_[kEmptyStringIndex]);
     JS_FreeRuntime(runtime_);
 };
 
@@ -213,7 +191,6 @@ void HandleScope::Exit() {
         //std::cout << "---------------- start HandleScope::Exit -------------------" << std::endl;
         //std::cout << prev_pos_ << "," << isolate_->value_alloc_pos_ << std::endl;
         isolate_->ForeachAllocValue(prev_pos_, isolate_->value_alloc_pos_, [this](JSValue* val, int idx){
-            V8::FreeCString(*val);
             if (JS_VALUE_HAS_REF_COUNT(*val)) {
                 if (this->escapes_.find(val) == this->escapes_.end()) { //not excaped
                     //std::cout << "free val type:" << JS_VALUE_GET_TAG(*val) << "," << val << ", idx:" << idx << std::endl;
@@ -253,7 +230,7 @@ bool Value::IsExternal() const {
 }
 
 MaybeLocal<String> Value::ToString(Local<Context> context) const {
-    if (JS_VALUE_GET_TAG(value_) == JS_TAG_CSTRING || JS_IsString(value_)) {
+    if (JS_IsString(value_)) {
         return MaybeLocal<String>(Local<String>(static_cast<String*>(const_cast<Value*>(this))));
     } else {
         //由HandleScope跟踪回收
@@ -270,11 +247,14 @@ MaybeLocal<String> String::NewFromUtf8(
     String *str = isolate->Alloc<String>();
     //printf("NewFromUtf8:%p\n", str);
     size_t len = length > 0 ? length : strlen(data);
-    str->value_ = V8::NewCString(data, len);
+    str->value_ = JS_NewStringLen(isolate->current_context_->context_, data, len);
     return Local<String>(str);
 }
 
 Local<String> String::Empty(Isolate* isolate) {
+    if (JS_IsUndefined(isolate->literal_values_[kEmptyStringIndex])) {
+        isolate->literal_values_[kEmptyStringIndex] = JS_NewStringLen(isolate->current_context_->context_, "", 0);
+    }
     return Local<String>(reinterpret_cast<String*>(&isolate->literal_values_[kEmptyStringIndex]));
 }
 
@@ -396,14 +376,8 @@ int64_t Integer::Value() const {
 
 String::Utf8Value::Utf8Value(Isolate* isolate, Local<v8::Value> obj) {
     auto context = isolate->GetCurrentContext();
-    if (JS_VALUE_GET_TAG(obj->value_) != JS_TAG_CSTRING) {
-        data_ = JS_ToCStringLen(context->context_, &len_, obj->value_);
-        context_ = context->context_;
-    } else {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(obj->value_);
-        data_ = cstr->data;
-        len_ = cstr->len;
-    }
+    data_ = JS_ToCStringLen(context->context_, &len_, obj->value_);
+    context_ = context->context_;
 }
 
 String::Utf8Value::~Utf8Value() {
@@ -446,12 +420,7 @@ MaybeLocal<Value> Function::Call(Local<Context> context,
     JSValue *js_argv = (JSValue*)alloca(argc * sizeof(JSValue));
     for(int i = 0 ; i < argc; i++) {
         isolate->Escape(*argv[i]);
-        if (JS_VALUE_IS_CSTRING(argv[i]->value_)) {
-            CString *cstr = (CString *)JS_VALUE_GET_PTR(argv[i]->value_);
-            js_argv[i] = JS_NewStringLen(context->context_, cstr->data, cstr->len);
-        } else {
-            js_argv[i] = argv[i]->value_;
-        }
+        js_argv[i] = argv[i]->value_;
     }
     JSValue ret = JS_Call(context->context_, value_, *js_this, argc, js_argv);
     
@@ -623,22 +592,10 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
 
 Maybe<bool> Object::Set(Local<Context> context,
                         Local<Value> key, Local<Value> value) {
-    JSValue jsValue;
-    if (JS_VALUE_GET_TAG(value->value_) != JS_TAG_CSTRING) {
-        jsValue = value->value_;
+    if (key->IsNumber()) {
+        JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), value->value_);
     } else {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(value->value_);
-        jsValue = JS_NewStringLen(context->context_, cstr->data, cstr->len);
-    }
-    if (JS_VALUE_GET_TAG(key->value_) == JS_TAG_CSTRING) {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(key->value_);
-        JS_SetPropertyStr(context->context_, value_, cstr->data, jsValue);
-    } else {
-        if (key->IsNumber()) {
-            JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), jsValue);
-        } else {
-            JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), jsValue);
-        }
+        JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), value->value_);
     }
     
     context->GetIsolate()->Escape(*value);
@@ -702,14 +659,8 @@ Local<Value> TryCatch::Exception() const {
 }
 
 MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
-    if (stacktrace_.length() == 0) {
-        JSValue stackVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_stack);
-        const char* stack = JS_ToCString(isolate_->current_context_->context_, stackVal);
-        stacktrace_ = stack;
-        JS_FreeCString(isolate_->current_context_->context_, stack);
-    }
     auto str = context->GetIsolate()->Alloc<String>();
-    str->value_ = V8::NewCString(stacktrace_.data(), stacktrace_.length());
+    str->value_ = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_stack);;
     return MaybeLocal<Value>(Local<String>(str));
 }
     

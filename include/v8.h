@@ -22,10 +22,6 @@
 #include "quickjs-msvc.h"
 
 #define JS_TAG_EXTERNAL (JS_TAG_FLOAT64 + 1)
-#define JS_TAG_CSTRING (JS_TAG_FLOAT64 + 2)
-#define JS_TAG_V8_EMPTY (JS_TAG_FLOAT64 + 3)
-
-#define JS_VALUE_IS_CSTRING(v) (JS_VALUE_GET_TAG(v) == JS_TAG_CSTRING)
 
 namespace v8 {
 class Object;
@@ -53,11 +49,6 @@ public:
     const char* data;
     int raw_size;
 };
-
-typedef struct CString {
-    size_t len;
-    char data[1];
-} CString;
 
 class V8_EXPORT V8 {
 public:
@@ -96,10 +87,6 @@ public:
             abort();
         }
     }
-    
-    static JSValue NewCString(const char* str, size_t len) ;
-    
-    static void FreeCString(JSValue &str);
 };
 
 void IncRef_(Isolate * isolate, JSValue val);
@@ -168,7 +155,7 @@ public:
     }
     
     V8_INLINE bool SupportWeak() {
-        return !IsEmpty() && !JS_VALUE_IS_CSTRING(val_->value_);
+        return !IsEmpty();
     }
     
     V8_INLINE void IncRef(Isolate * isolate) {
@@ -1126,9 +1113,7 @@ private:
 class V8_EXPORT Message : Data {
 public:
     V8_INLINE Local<Value> GetScriptResourceName() const {
-        auto str = Isolate::current_->Alloc<String>();
-        str->value_ = V8::NewCString(resource_name_.data(), resource_name_.length());
-        return Local<String>(str);
+        return String::NewFromUtf8(Isolate::current_, resource_name_.data(), NewStringType::kNormal, resource_name_.length()).ToLocalChecked();
     }
     
     //TODO: quickjs未提供该信息?
@@ -1170,8 +1155,6 @@ public:
     TryCatch* prev_;
     
     V8_WARN_UNUSED_RESULT MaybeLocal<Value> StackTrace(Local<Context> context);
-    
-    std::string stacktrace_;
 };
 
 template <typename T>
@@ -1181,13 +1164,10 @@ void ReturnValue<T>::Set(const Local<S> handle) {
                 "type check");
     if (V8_UNLIKELY(handle.IsEmpty())) {
         SetUndefined();
-    } else if (JS_VALUE_GET_TAG(handle->value_) != JS_TAG_CSTRING) {
+    } else {
         //如果向js返回了一个数据，这个数据应该Escape
         isolate_->Escape(*handle);
         *pvalue_ = handle->value_;
-    } else {
-        CString* cstr = (CString*)JS_VALUE_GET_PTR(handle->value_);
-        *pvalue_ = JS_NewStringLen_(context_, cstr->data, cstr->len);
     }
 }
 
