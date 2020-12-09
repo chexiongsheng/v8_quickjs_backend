@@ -984,6 +984,13 @@ JSValue JS_False();
 JSValue JS_Null();
 JSValue JS_Undefined();
 void *JS_GetOpaque3(JSValueConst obj);
+JS_BOOL JS_IsArrayBuffer(JSValueConst obj);
+JS_BOOL JS_IsArrayBufferView(JSValueConst obj);
+JSValue JS_GetArrayBufferView(JSContext *ctx, JSValueConst obj);
+JS_BOOL JS_GetArrayBufferViewInfo(JSContext *ctx, JSValueConst obj,
+                                  size_t *pbyte_offset,
+                                  size_t *pbyte_length,
+                                  size_t *pbytes_per_element);
 /*-------end fuctions for v8 api---------*/
 
 #undef js_unlikely

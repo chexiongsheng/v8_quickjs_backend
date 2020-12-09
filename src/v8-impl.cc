@@ -209,6 +209,14 @@ bool Value::IsFunction() const {
     return JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, value_);
 }
 
+bool Value::IsArrayBuffer() const {
+    return JS_IsArrayBuffer(value_);
+}
+
+bool Value::IsArrayBufferView() const {
+    return JS_IsArrayBufferView(value_);
+}
+
 bool Value::IsObject() const {
     return JS_IsObject(value_);
 }
@@ -331,7 +339,6 @@ Local<Integer> Integer::NewFromUnsigned(Isolate* isolate, uint32_t value) {
     return Local<Integer>(ret);
 }
 
-
 Local<BigInt> BigInt::New(Isolate* isolate, int64_t value) {
     BigInt* ret = isolate->Alloc<BigInt>();
     ret->value_ = JS_NewBigInt64(isolate->current_context_->context_, value);
@@ -407,6 +414,29 @@ ArrayBuffer::Contents ArrayBuffer::GetContents() {
     ArrayBuffer::Contents ret;
     ret.data_ = JS_GetArrayBuffer(Isolate::current_->current_context_->context_, &ret.byte_length_, value_);
     return ret;
+}
+
+Local<ArrayBuffer> ArrayBufferView::Buffer() {
+    Isolate* isolate = Isolate::current_;
+    ArrayBuffer* ab = isolate->Alloc<ArrayBuffer>();
+    ab->value_ = JS_GetArrayBufferView(isolate->current_context_->context_, value_);
+    return Local<ArrayBuffer>(ab);
+}
+    
+size_t ArrayBufferView::ByteOffset() {
+    size_t byte_offset;
+    size_t byte_length;
+    size_t bytes_per_element;
+    JS_GetArrayBufferViewInfo(Isolate::current_->current_context_->context_, value_, &byte_offset, &byte_length, &bytes_per_element);
+    return byte_offset;
+}
+    
+size_t ArrayBufferView::ByteLength() {
+    size_t byte_offset;
+    size_t byte_length;
+    size_t bytes_per_element;
+    JS_GetArrayBufferViewInfo(Isolate::current_->current_context_->context_, value_, &byte_offset, &byte_length, &bytes_per_element);
+    return byte_length;
 }
 
 int Isolate::RegFunctionTemplate(Local<FunctionTemplate> data) {

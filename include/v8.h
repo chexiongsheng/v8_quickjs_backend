@@ -448,10 +448,9 @@ public:
 
     bool IsFunction() const;
     
-    //似乎得对quickjs进行一定的改造S
-    //V8_INLINE bool IsArrayBuffer() const;
+    bool IsArrayBuffer() const;
     
-    //V8_INLINE bool IsArrayBufferView() const;
+    bool IsArrayBufferView() const;
     
     //V8_INLINE bool IsDate() const;
 
@@ -517,6 +516,23 @@ public:
                                   ArrayBufferCreationMode mode = ArrayBufferCreationMode::kExternalized);
     
     Contents GetContents();
+    
+    V8_INLINE static ArrayBuffer* Cast(Value* obj) {
+        return static_cast<ArrayBuffer*>(obj);
+    }
+};
+
+class V8_EXPORT ArrayBufferView : public Object {
+public:
+    Local<ArrayBuffer> Buffer();
+    
+    size_t ByteOffset();
+    
+    size_t ByteLength();
+    
+    V8_INLINE static ArrayBufferView* Cast(Value* obj) {
+        return static_cast<ArrayBufferView*>(obj);
+    }
 };
 
 enum {

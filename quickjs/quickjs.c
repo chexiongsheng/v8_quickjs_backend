@@ -53808,4 +53808,79 @@ void *JS_GetOpaque3(JSValueConst obj)
     p = JS_VALUE_GET_OBJ(obj);
     return p->u.opaque;
 }
+
+JS_BOOL JS_IsArrayBuffer(JSValueConst obj)
+{
+    JSObject *p;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+    {
+        return FALSE;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    
+    return p->class_id == JS_CLASS_ARRAY_BUFFER;
+}
+
+JS_BOOL JS_IsArrayBufferView(JSValueConst obj)
+{
+    JSObject *p;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+    {
+        return FALSE;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    return JS_CLASS_DATAVIEW == p->class_id || (p->class_id >= JS_CLASS_UINT8C_ARRAY && p->class_id <= JS_CLASS_FLOAT64_ARRAY);
+}
+
+JSValue JS_GetArrayBufferView(JSContext *ctx, JSValueConst obj)
+{
+    JSObject *p;
+    JSTypedArray *ta;
+    
+    if (!JS_IsArrayBufferView(obj)) {
+        JS_ThrowTypeError(ctx, "not a ArrayBufferView");
+        return JS_UNDEFINED;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    
+    p = get_typed_array(ctx, obj, JS_CLASS_DATAVIEW == p->class_id);
+    if (!p)
+        return JS_EXCEPTION;
+    if (typed_array_is_detached(ctx, p))
+        return JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
+    ta = p->u.typed_array;
+    return JS_DupValue(ctx, JS_MKPTR(JS_TAG_OBJECT, ta->buffer));
+}
+
+JS_BOOL JS_GetArrayBufferViewInfo(JSContext *ctx, JSValueConst obj,
+                               size_t *pbyte_offset,
+                               size_t *pbyte_length,
+                               size_t *pbytes_per_element)
+{
+    JSObject *p;
+    JSTypedArray *ta;
+    
+    if (!JS_IsArrayBufferView(obj)) {
+        JS_ThrowTypeError(ctx, "not a ArrayBufferView");
+        return FALSE;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    
+    p = get_typed_array(ctx, obj, JS_CLASS_DATAVIEW == p->class_id);
+    
+    if (!p)
+        return FALSE;
+    if (typed_array_is_detached(ctx, p))
+        return FALSE;
+    ta = p->u.typed_array;
+    if (pbyte_offset)
+        *pbyte_offset = ta->offset;
+    if (pbyte_length)
+        *pbyte_length = ta->length;
+    if (pbytes_per_element) {
+        *pbytes_per_element = 1 << typed_array_size_log2(p->class_id);
+    }
+    return TRUE;
+}
+
 /*-------end fuctions for v8 api---------*/

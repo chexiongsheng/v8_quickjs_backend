@@ -446,7 +446,7 @@ int main(int argc, char* argv[]) {
             arr[1] = 2;
             arr[2] = 3;
             
-            uint8_t arr2[2] = {4, 5};
+            uint8_t arr2[] = {4, 5, 6, 7, 8, 9};
             
             auto ab2 = v8::ArrayBuffer::New(isolate, arr2, sizeof(arr2));
             
@@ -462,6 +462,9 @@ int main(int argc, char* argv[]) {
                 print(u2.length);
                 print(u1);
                 print(u2);
+                //u1;
+                new Uint16Array(ab2, 2, 2);
+                //new DataView(ab2);
               )";
             
             // Create a string containing the JavaScript source code.
@@ -474,7 +477,13 @@ int main(int argc, char* argv[]) {
                 v8::Script::Compile(context, source).ToLocalChecked();
 
             // Run the script to get the result.
-            script->Run(context).ToLocalChecked();
+            auto ret = script->Run(context).ToLocalChecked();
+            if (ret->IsArrayBufferView()) {
+                auto dataview = ret.As<v8::ArrayBufferView>();
+                auto dvc = dataview->Buffer()->GetContents();
+                std::cout << "View->ByteLength(): " << dataview->ByteLength() << "," << dataview->ByteOffset() << std::endl;
+                std::cout << "dataview: " << dvc.Data() << "," << dvc.ByteLength() << std::endl;
+            }
         }
     }
 
