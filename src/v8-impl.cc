@@ -209,6 +209,10 @@ bool Value::IsFunction() const {
     return JS_IsFunction(Isolate::current_->GetCurrentContext()->context_, value_);
 }
 
+bool Value::IsDate() const {
+    return JS_IsDate(value_);
+}
+
 bool Value::IsArrayBuffer() const {
     return JS_IsArrayBuffer(value_);
 }
@@ -391,6 +395,16 @@ String::Utf8Value::~Utf8Value() {
     if (context_) {
         JS_FreeCString(context_, data_);
     }
+}
+
+MaybeLocal<Value> Date::New(Local<Context> context, double time) {
+    Date *date = context->GetIsolate()->Alloc<Date>();
+    date->value_ = JS_NewDate(context->context_, time);
+    return MaybeLocal<Value>(Local<Date>(date));
+}
+    
+double Date::ValueOf() const {
+    JS_GetDate(Isolate::current_->current_context_->context_, value_);
 }
 
 static std::vector<uint8_t> dummybuffer;

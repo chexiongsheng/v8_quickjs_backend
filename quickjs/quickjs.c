@@ -53883,4 +53883,39 @@ JS_BOOL JS_GetArrayBufferViewInfo(JSContext *ctx, JSValueConst obj,
     return TRUE;
 }
 
+JS_BOOL JS_IsDate(JSValueConst obj)
+{
+    JSObject *p;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+    {
+        return FALSE;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    
+    return p->class_id == JS_CLASS_DATE;
+}
+
+double JS_GetDate(JSContext *ctx, JSValueConst obj)
+{
+    double v;
+    if (!JS_ThisTimeValue(ctx, &v, obj))
+    {
+        v = JS_FLOAT64_NAN;
+    }
+    return v;
+}
+
+JSValue JS_NewDate(JSContext *ctx, double val)
+{
+    JSValue proto, obj;
+    JSContext *realm;
+    
+    proto = JS_DupValue(ctx, ctx->class_proto[JS_CLASS_DATE]);
+
+    obj = JS_NewObjectProtoClass(ctx, proto, JS_CLASS_DATE);
+    JS_FreeValue(ctx, proto);
+    JS_SetObjectData(ctx, obj, __JS_NewFloat64(ctx, val));
+    return obj;
+}
+
 /*-------end fuctions for v8 api---------*/

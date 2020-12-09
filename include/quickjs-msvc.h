@@ -991,6 +991,9 @@ JS_BOOL JS_GetArrayBufferViewInfo(JSContext *ctx, JSValueConst obj,
                                   size_t *pbyte_offset,
                                   size_t *pbyte_length,
                                   size_t *pbytes_per_element);
+JS_BOOL JS_IsDate(JSValueConst obj);
+double JS_GetDate(JSContext *ctx, JSValueConst obj);
+JSValue JS_NewDate(JSContext *ctx, double d);
 /*-------end fuctions for v8 api---------*/
 
 #undef js_unlikely

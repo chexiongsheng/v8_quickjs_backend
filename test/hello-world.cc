@@ -485,6 +485,30 @@ int main(int argc, char* argv[]) {
                 std::cout << "dataview: " << dvc.Data() << "," << dvc.ByteLength() << std::endl;
             }
         }
+        
+        //date
+        {
+            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked(), v8::Date::New(context, 9999.99).ToLocalChecked()).Check();
+            const char* csource = R"(
+                print(gdate);
+                new Date('1997-7-1T00:00:00');
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            auto ret = script->Run(context).ToLocalChecked();
+            if (ret->IsDate()) {
+                std::cout << "date.valueof:" << ret.As<v8::Date>()->ValueOf() << std::endl;
+            }
+        }
     }
 
     // Dispose the isolate and tear down V8.

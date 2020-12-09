@@ -452,7 +452,7 @@ public:
     
     bool IsArrayBufferView() const;
     
-    //V8_INLINE bool IsDate() const;
+    bool IsDate() const;
 
     bool IsObject() const;
 
@@ -483,6 +483,17 @@ public:
     
     V8_INLINE static Object* Cast(Value* obj) {
         return static_cast<Object*>(obj);
+    }
+};
+
+class V8_EXPORT Date : public Object {
+public:
+    static V8_WARN_UNUSED_RESULT MaybeLocal<Value> New(Local<Context> context, double time);
+    
+    double ValueOf() const;
+    
+    V8_INLINE static Date* Cast(Value* obj) {
+        return static_cast<Date*>(obj);
     }
 };
 
