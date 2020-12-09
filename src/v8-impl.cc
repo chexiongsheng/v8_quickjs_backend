@@ -386,6 +386,29 @@ String::Utf8Value::~Utf8Value() {
     }
 }
 
+static std::vector<uint8_t> dummybuffer;
+
+Local<ArrayBuffer> ArrayBuffer::New(Isolate* isolate, size_t byte_length) {
+    ArrayBuffer *ab = isolate->Alloc<ArrayBuffer>();
+    if (dummybuffer.size() < byte_length) dummybuffer.resize(byte_length, 0);
+    ab->value_ = JS_NewArrayBufferCopy(isolate->current_context_->context_, dummybuffer.data(), byte_length);
+    return Local<ArrayBuffer>(ab);
+}
+
+Local<ArrayBuffer> ArrayBuffer::New(Isolate* isolate, void* data, size_t byte_length,
+                                           ArrayBufferCreationMode mode) {
+    V8::Check(mode == ArrayBufferCreationMode::kExternalized, "only ArrayBufferCreationMode::kExternalized support!");
+    ArrayBuffer *ab = isolate->Alloc<ArrayBuffer>();
+    ab->value_ = JS_NewArrayBuffer(isolate->current_context_->context_, (uint8_t*)data, byte_length, nullptr, nullptr, false);
+    return Local<ArrayBuffer>(ab);
+}
+
+ArrayBuffer::Contents ArrayBuffer::GetContents() {
+    ArrayBuffer::Contents ret;
+    ret.data_ = JS_GetArrayBuffer(Isolate::current_->current_context_->context_, &ret.byte_length_, value_);
+    return ret;
+}
+
 int Isolate::RegFunctionTemplate(Local<FunctionTemplate> data) {
     function_templates_.push_back(data);
     return function_templates_.size() - 1;

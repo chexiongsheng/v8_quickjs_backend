@@ -487,6 +487,8 @@ public:
     }
 };
 
+enum class ArrayBufferCreationMode { kInternalized, kExternalized };
+
 class V8_EXPORT ArrayBuffer : public Object {
 public:
     class V8_EXPORT Allocator { // NOLINT
@@ -497,6 +499,24 @@ public:
             return nullptr;
         }
     };
+    
+    class V8_EXPORT Contents { // NOLINT
+    public:
+        void* Data() const { return data_; }
+        
+        size_t ByteLength() const { return byte_length_; }
+        
+        void* data_;
+        
+        size_t byte_length_;
+    };
+    
+    static Local<ArrayBuffer> New(Isolate* isolate, size_t byte_length);
+    
+    static Local<ArrayBuffer> New(Isolate* isolate, void* data, size_t byte_length,
+                                  ArrayBufferCreationMode mode = ArrayBufferCreationMode::kExternalized);
+    
+    Contents GetContents();
 };
 
 enum {

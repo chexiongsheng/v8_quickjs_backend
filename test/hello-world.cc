@@ -438,6 +438,44 @@ int main(int argc, char* argv[]) {
             script->Run(context).ToLocalChecked();
         }
         
+        //arraybuffer
+        {
+            auto ab1 = v8::ArrayBuffer::New(isolate, 3);
+            uint8_t * arr = (uint8_t*)ab1->GetContents().Data();
+            arr[0] = 1;
+            arr[1] = 2;
+            arr[2] = 3;
+            
+            uint8_t arr2[2] = {4, 5};
+            
+            auto ab2 = v8::ArrayBuffer::New(isolate, arr2, sizeof(arr2));
+            
+            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "ab1").ToLocalChecked(), ab1).Check();
+            //qucikjs new的对象，只能用一次，不能多次设置，否则会触发引用计数小于0的报错，这点和v8不太一样，可以考虑在Escape那增加饮用计数
+            //context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "ab2").ToLocalChecked(), ab1).Check();
+            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "ab2").ToLocalChecked(), ab2).Check();
+
+            const char* csource = R"(
+                let u1 = new Uint8Array(ab1);
+                let u2 = new Uint8Array(ab2);
+                print(u1.length);
+                print(u2.length);
+                print(u1);
+                print(u2);
+              )";
+            
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            script->Run(context).ToLocalChecked();
+        }
     }
 
     // Dispose the isolate and tear down V8.
