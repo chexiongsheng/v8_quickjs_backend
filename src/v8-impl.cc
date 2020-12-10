@@ -470,7 +470,7 @@ Local<Object> Context::Global() {
 
 Context::Context(Isolate* isolate) :isolate_(isolate) {
     context_ = JS_NewContext(isolate->runtime_);
-    JS_SetContextOpaque(context_, isolate);
+    JS_SetContextOpaque(context_, this);
     global_ = JS_GetGlobalObject(context_);
 }
 
@@ -525,7 +525,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
             flag |= JS_PROP_HAS_GET;
             JSCFunctionType pfunc;
             pfunc.getter_magic = [](JSContext *ctx, JSValueConst this_val, int magic) {
-                Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
+                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
                 Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
                 FunctionCallbackInfo<Value> callbackInfo;
                 callbackInfo.isolate_ = isolate;
@@ -549,7 +549,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
             flag |= JS_PROP_HAS_SET;
             flag |= JS_PROP_WRITABLE;
             pfunc.setter_magic = [](JSContext *ctx, JSValueConst this_val, JSValueConst val, int magic) {
-                Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
+                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
                 Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
                 FunctionCallbackInfo<Value> callbackInfo;
                 callbackInfo.isolate_ = isolate;
@@ -615,7 +615,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     //TODO: cache function for context
     bool isCtor = !prototype_template_.IsEmpty();
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
-        Isolate* isolate = reinterpret_cast<Isolate*>(JS_GetContextOpaque(ctx));
+        Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
         Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
         FunctionCallbackInfo<Value> callbackInfo;
         callbackInfo.isolate_ = isolate;
