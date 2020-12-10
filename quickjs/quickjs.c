@@ -53918,4 +53918,16 @@ JSValue JS_NewDate(JSContext *ctx, double val)
     return obj;
 }
 
+JS_BOOL JS_IsRegExp(JSValueConst obj)
+{
+    JSObject *p;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+    {
+        return FALSE;
+    }
+    p = JS_VALUE_GET_OBJ(obj);
+    
+    return p->class_id == JS_CLASS_REGEXP;
+}
+
 /*-------end fuctions for v8 api---------*/

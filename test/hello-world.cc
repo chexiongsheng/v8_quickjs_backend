@@ -306,6 +306,7 @@ int main(int argc, char* argv[]) {
 
         {
             const char* csource = R"(
+                var patt = /runoob/i;
                 native_add(5, 6);
                 //g_number;
               )";
@@ -564,6 +565,8 @@ int main(int argc, char* argv[]) {
             std::cout << "find jsfunc? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "jsfunc").ToLocalChecked()).ToLocalChecked()->IsFunction() << std::endl;
             std::cout << "find gdate? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked()).ToLocalChecked()->IsDate() << std::endl;
             std::cout << "map111 == undefined? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "map111").ToLocalChecked()).ToLocalChecked()->IsUndefined() << std::endl;
+            std::cout << "find patt? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "patt").ToLocalChecked()).ToLocalChecked()->IsRegExp() << std::endl;
+            std::cout << "gdate is regexp ? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked()).ToLocalChecked()->IsRegExp() << std::endl;
         }
     }
 

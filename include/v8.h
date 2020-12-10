@@ -43,6 +43,7 @@ class Value;
 class Primitive;
 class Boolean;
 class HandleScope;
+class BigInt;
 
 class V8_EXPORT StartupData {
 public:
@@ -464,6 +465,15 @@ public:
 
     bool IsExternal() const;
     
+    bool IsInt32() const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<BigInt> ToBigInt(
+        Local<Context> context) const;
+    
+    bool BooleanValue(Isolate* isolate) const;
+    
+    bool IsRegExp() const;
+    
     V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(
         Local<Context> context) const;
     
@@ -812,6 +822,10 @@ public:
     
     V8_INLINE Local<T> Get(Isolate* isolate) const {
         return val_;
+    }
+    
+    V8_INLINE bool IsEmpty(Isolate* isolate) const {
+        return val_.IsEmpty();
     }
     
     //PersistentBase(const PersistentBase& other) = delete;  // NOLINT

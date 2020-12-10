@@ -260,6 +260,27 @@ bool Value::IsExternal() const {
     return JS_VALUE_GET_TAG(value_) == JS_TAG_EXTERNAL;
 }
 
+bool Value::IsInt32() const {
+    return JS_IsNumber(value_);
+}
+
+MaybeLocal<BigInt> Value::ToBigInt(Local<Context> context) const {
+    if (IsBigInt()) {
+        return MaybeLocal<BigInt>(Local<BigInt>(static_cast<BigInt*>(const_cast<Value*>(this))));
+    } else {
+        return MaybeLocal<BigInt>();
+    }
+}
+
+bool Value::BooleanValue(Isolate* isolate) const {
+    return JS_ToBool(isolate->current_context_->context_, value_);
+}
+
+bool Value::IsRegExp() const {
+    return JS_IsRegExp(value_);
+}
+
+
 MaybeLocal<String> Value::ToString(Local<Context> context) const {
     if (JS_IsString(value_)) {
         return MaybeLocal<String>(Local<String>(static_cast<String*>(const_cast<Value*>(this))));
@@ -536,7 +557,7 @@ MaybeLocal<Object> Function::NewInstance(Local<Context> context, int argc, Local
         isolate->Escape(*argv[i]);
         js_argv[i] = argv[i]->value_;
     }
-    std::cout << "JS_IsFunction(context->context_, value_):" << JS_IsFunction(context->context_, value_) << "," << JS_VALUE_GET_TAG(value_) << std::endl;
+    
     JSValue ret = JS_CallConstructor(context->context_, value_, argc, js_argv);
     
     auto maybe_value = ProcessResult(isolate, ret);
