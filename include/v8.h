@@ -1017,6 +1017,7 @@ public:
     
     Local<ObjectTemplate> instance_template_;
     Local<ObjectTemplate> prototype_template_;
+    Local<FunctionTemplate> parent_;
     
     std::map<Context*, Global<Function>> context_to_funtion_;
 };

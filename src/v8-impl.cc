@@ -601,7 +601,7 @@ Local<ObjectTemplate> FunctionTemplate::InstanceTemplate() {
 }
     
 void FunctionTemplate::Inherit(Local<FunctionTemplate> parent) {
-    //TODO:
+    parent_ = parent;
 }
     
 Local<ObjectTemplate> FunctionTemplate::PrototypeTemplate() {
@@ -652,6 +652,13 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         InitPropertys(context, func);
         JS_SetConstructor(context->context_, func, proto);
         JS_FreeValue(context->context_, proto);
+        
+        if (!parent_.IsEmpty()) {
+            Local<Function> parent_func = parent_->GetFunction(context).ToLocalChecked();
+            JSValue parent_proto = JS_GetProperty(context->context_, parent_func->value_, JS_ATOM_prototype);
+            JS_SetPrototype(context->context_, proto, parent_proto);
+            JS_FreeValue(context->context_, parent_proto);
+        }
     }
     
     Function* function = context->GetIsolate()->Alloc<Function>();

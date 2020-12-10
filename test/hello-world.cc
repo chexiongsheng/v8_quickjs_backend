@@ -81,6 +81,14 @@ static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& info) {
     (*self).SetWeak<v8::Global<v8::Object>>(self, OnGarbageCollected, v8::WeakCallbackType::kInternalFields);
 }
 
+static void MapBaseMethod(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    std::cout << "MapBaseMethod: map=" << map << ", size=" << map->size() <<  std::endl;
+}
+
 static void MapGet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
@@ -207,6 +215,10 @@ int main(int argc, char* argv[]) {
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "getbigint").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, GetInt64)->GetFunction(context).ToLocalChecked())
             .Check();
+        
+        auto base_tpl = v8::FunctionTemplate::New(isolate, NewMap);
+        base_tpl->InstanceTemplate()->SetInternalFieldCount(1);
+        base_tpl->PrototypeTemplate()->Set(isolate, "basemethod", v8::FunctionTemplate::New(isolate, MapBaseMethod));
 
         auto tpl = v8::FunctionTemplate::New(isolate, NewMap);
         tpl->InstanceTemplate()->SetInternalFieldCount(1);
@@ -217,6 +229,8 @@ int main(int argc, char* argv[]) {
         tpl->Set(isolate, "static", v8::FunctionTemplate::New(isolate, MapStatic));
         tpl->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "sprop").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapStaticPropGet),
                                  v8::FunctionTemplate::New(isolate, MapStaticPropSet));
+        
+        tpl->Inherit(base_tpl);
 
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "map").ToLocalChecked(), tpl->GetFunction(context).ToLocalChecked()).Check();
 
@@ -307,6 +321,9 @@ int main(int argc, char* argv[]) {
                 print(m.get('def'));
                 print(m.get('fff'));
                 m.count = 1000;
+            
+                m.basemethod();
+            
                 map.static(1024);
                 print(map.sprop);
                 map.sprop = 888;
