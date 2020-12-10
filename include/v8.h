@@ -704,11 +704,11 @@ public:
 };
 
 V8_INLINE void IncRef_(Isolate * isolate, JSValue val) {
-    JS_DupValue(isolate->current_context_->context_, val);
+    JS_DupValueRT(isolate->runtime_, val);
 }
 
 V8_INLINE void DecRef_(Isolate * isolate, JSValue val) {
-    JS_FreeValue(isolate->current_context_->context_, val);
+    JS_FreeValueRT(isolate->runtime_, val);
 }
 
 
@@ -778,6 +778,10 @@ public:
     Local<T> val_;
     bool weak_ = false;
     JSValue store_;
+    
+    V8_INLINE Local<T> Get(Isolate* isolate) const {
+        return val_;
+    }
     
     V8_INLINE ~PersistentBase() {
         Reset();
@@ -1013,6 +1017,8 @@ public:
     
     Local<ObjectTemplate> instance_template_;
     Local<ObjectTemplate> prototype_template_;
+    
+    std::map<Context*, Global<Function>> context_to_funtion_;
 };
 
 template<typename T>

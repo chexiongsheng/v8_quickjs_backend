@@ -612,7 +612,10 @@ Local<ObjectTemplate> FunctionTemplate::PrototypeTemplate() {
 }
 
 MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
-    //TODO: cache function for context
+    auto iter = context_to_funtion_.find(*context);
+    if (iter != context_to_funtion_.end()) {
+        return iter->second.Get(context->GetIsolate());
+    }
     bool isCtor = !prototype_template_.IsEmpty();
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
         Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
@@ -654,7 +657,11 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     Function* function = context->GetIsolate()->Alloc<Function>();
     function->value_ = func;
     
-    return MaybeLocal<Function>(Local<Function>(function));
+    Local<Function> ret(function);
+    
+    context_to_funtion_[*context] = Global<Function>(context->GetIsolate(), ret);
+    
+    return MaybeLocal<Function>(ret);
 }
 
 Maybe<bool> Object::Set(Local<Context> context,
