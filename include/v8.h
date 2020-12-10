@@ -467,6 +467,11 @@ public:
     V8_WARN_UNUSED_RESULT MaybeLocal<String> ToString(
         Local<Context> context) const;
     
+    V8_WARN_UNUSED_RESULT MaybeLocal<Object> ToObject(
+        Local<Context> context) const;
+    
+    V8_WARN_UNUSED_RESULT Maybe<double> NumberValue(Local<Context> context) const;
+    
     JSValue value_;
     
     Value() = delete;
@@ -480,6 +485,8 @@ public:
     void SetAlignedPointerInInternalField(int index, void* value);
     
     void* GetAlignedPointerFromInternalField(int index);
+    
+    int InternalFieldCount();
     
     V8_INLINE static Object* Cast(Value* obj) {
         return static_cast<Object*>(obj);
@@ -1256,7 +1263,7 @@ public:
     
     TryCatch* prev_;
     
-    V8_WARN_UNUSED_RESULT MaybeLocal<Value> StackTrace(Local<Context> context);
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> StackTrace(Local<Context> context) const;
 };
 
 template <typename T>

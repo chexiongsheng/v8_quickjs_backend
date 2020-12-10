@@ -272,6 +272,22 @@ MaybeLocal<String> Value::ToString(Local<Context> context) const {
     
 }
 
+V8_WARN_UNUSED_RESULT MaybeLocal<Object> Value::ToObject(Local<Context> context) const {
+    if (IsObject()) {
+        return MaybeLocal<Object>(Local<Object>(Object::Cast(const_cast<Value*>(this))));
+    } else {
+        return MaybeLocal<Object>();
+    }
+}
+
+V8_WARN_UNUSED_RESULT Maybe<double> Value::NumberValue(Local<Context> context) const {
+    if (IsNumber()) {
+        return Maybe<double>(Number::Cast(const_cast<Value*>(this))->Value());
+    } else {
+        return Maybe<double>();
+    }
+}
+
 MaybeLocal<String> String::NewFromUtf8(
     Isolate* isolate, const char* data,
     NewStringType type, int length) {
@@ -762,6 +778,17 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
     return objectUdata->ptrs_[index];
 }
 
+int Object::InternalFieldCount() {
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(value_));
+    
+    bool noObjectUdata = IsFunction() || objectUdata == nullptr;
+
+    if (noObjectUdata) {
+        return 0;
+    }
+    return objectUdata->len_;
+}
+
 TryCatch::TryCatch(Isolate* isolate) {
     isolate_ = isolate;
     catched_ = JS_Undefined();
@@ -782,7 +809,7 @@ Local<Value> TryCatch::Exception() const {
     return Local<Value>(reinterpret_cast<Value*>(const_cast<JSValue*>(&catched_)));
 }
 
-MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) {
+MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) const {
     auto str = context->GetIsolate()->Alloc<String>();
     str->value_ = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_stack);;
     return MaybeLocal<Value>(Local<String>(str));
