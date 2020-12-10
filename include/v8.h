@@ -783,9 +783,9 @@ public:
         return val_;
     }
     
-    V8_INLINE ~PersistentBase() {
-        Reset();
-    }
+    //PersistentBase(const PersistentBase& other) = delete;  // NOLINT
+    //void operator=(const PersistentBase&) = delete;
+    
 };
 
 template <class T>
@@ -797,6 +797,43 @@ public:
     V8_INLINE Global(Isolate* isolate, Local<S> that) {
         static_assert(std::is_base_of<T, S>::value, "type check");
         PersistentBase<T>::Reset(isolate, that);
+    }
+    
+    V8_INLINE Global(Global&& other) {
+        this->isolate_ = other.isolate_;
+        this->val_ = other.val_;
+        this->weak_ = other.weak_;
+        this->val_.SetGlobal(this->isolate_, reinterpret_cast<Value*>(&this->store_));
+        
+        other.val_ = nullptr;
+        other.weak_ = true;
+        other.isolate_ = nullptr;
+    }
+    
+    template <class S>
+    V8_INLINE Global& operator=(Global<S>&& rhs) {
+        static_assert(std::is_base_of<T, S>::value, "type check");
+        if (this != &rhs) {
+          this->Reset();
+          if (!rhs.val_.IsEmpty()) {
+              this->isolate_ = rhs.isolate_;
+              this->val_ = Local<T>::Cast(rhs.val_);
+              this->weak_ = rhs.weak_;
+              this->val_.SetGlobal(this->isolate_, reinterpret_cast<Value*>(&(this->store_)));
+              
+              rhs.weak_ = true;
+              rhs.isolate_ = nullptr;
+          }
+        }
+        return *this;
+    }
+    
+    void operator=(const Global&) = delete;
+    
+    Global(const Global&) = delete;
+    
+    ~Global() {
+        this->Reset();
     }
 };
 
@@ -947,6 +984,8 @@ public:
     V8_INLINE static Function* Cast(v8::Value* obj) {
         return static_cast<Function*>(obj);
     }
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context, int argc, Local<Value> argv[]) const;
 };
 
 enum PropertyAttribute {

@@ -115,6 +115,7 @@ Isolate::~Isolate() {
         delete values_[i];
     }
     values_.clear();
+    function_templates_.clear();
     JS_FreeValueRT(runtime_, literal_values_[kEmptyStringIndex]);
     JS_FreeRuntime(runtime_);
 };
@@ -492,6 +493,24 @@ MaybeLocal<Value> Function::Call(Local<Context> context,
     JSValue ret = JS_Call(context->context_, value_, *js_this, argc, js_argv);
     
     return ProcessResult(isolate, ret);
+}
+
+MaybeLocal<Object> Function::NewInstance(Local<Context> context, int argc, Local<Value> argv[]) const {
+    Isolate *isolate = context->GetIsolate();
+    JSValue *js_argv = (JSValue*)alloca(argc * sizeof(JSValue));
+    for(int i = 0 ; i < argc; i++) {
+        isolate->Escape(*argv[i]);
+        js_argv[i] = argv[i]->value_;
+    }
+    std::cout << "JS_IsFunction(context->context_, value_):" << JS_IsFunction(context->context_, value_) << "," << JS_VALUE_GET_TAG(value_) << std::endl;
+    JSValue ret = JS_CallConstructor(context->context_, value_, argc, js_argv);
+    
+    auto maybe_value = ProcessResult(isolate, ret);
+    if (maybe_value.IsEmpty()) {
+        return MaybeLocal<Object>();
+    } else {
+        return MaybeLocal<Object>(maybe_value.ToLocalChecked().As<Object>());
+    }
 }
 
 void Template::Set(Isolate* isolate, const char* name, Local<Data> value) {

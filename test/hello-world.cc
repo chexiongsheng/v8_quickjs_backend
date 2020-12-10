@@ -74,11 +74,17 @@ static void NewMap(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> Context = isolate->GetCurrentContext();
 
-    std::map<std::string, std::string>* map = new std::map<std::string, std::string>();
-    info.This()->SetAlignedPointerInInternalField(0, map);
-    v8::Global<v8::Object> *self = new v8::Global<v8::Object>(isolate, info.This());
-    std::cout << "map=" << map << ",v8::Global=" << self <<  std::endl;
-    (*self).SetWeak<v8::Global<v8::Object>>(self, OnGarbageCollected, v8::WeakCallbackType::kInternalFields);
+    if (info[0]->IsExternal()) {
+        void* map = v8::Local<v8::External>::Cast(info[0])->Value();
+        info.This()->SetAlignedPointerInInternalField(0, map);
+        std::cout << "just bind, map=" << map << std::endl;
+    } else {
+        std::map<std::string, std::string>* map = new std::map<std::string, std::string>();
+        info.This()->SetAlignedPointerInInternalField(0, map);
+        v8::Global<v8::Object> *self = new v8::Global<v8::Object>(isolate, info.This());
+        std::cout << "map=" << map << ",v8::Global=" << self <<  std::endl;
+        (*self).SetWeak<v8::Global<v8::Object>>(self, OnGarbageCollected, v8::WeakCallbackType::kInternalFields);
+    }
 }
 
 static void MapBaseMethod(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -329,13 +335,20 @@ int main(int argc, char* argv[]) {
                 map.sprop = 888;
                 m = undefined;
                 
-                //print(g_map.count);
-                //print(g_map.get('test'));
-                //g_map = undefined;
+                print(g_map.count);
+                print(g_map.get('test'));
+                g_map = undefined;
               )";
 
-            //std::map<std::string, std::string> stack_map;
-            //stack_map["test"] = "ok";
+            std::map<std::string, std::string> stack_map;
+            stack_map["test"] = "ok";
+            //绑定的方案1
+            auto bindto = v8::External::New(context->GetIsolate(), &stack_map);
+            v8::Local<v8::Value> args[] = { bindto };
+            auto binded = tpl->GetFunction(context).ToLocalChecked()->NewInstance(context, 1, args);
+            context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "g_map").ToLocalChecked(), binded.ToLocalChecked()).Check();
+            
+            //绑定的方案2
             //auto stack_map_obj = tpl->InstanceTemplate()->NewInstance(context).ToLocalChecked();
             //stack_map_obj->SetAlignedPointerInInternalField(0, &stack_map);
             //context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "g_map").ToLocalChecked(), stack_map_obj).Check();
