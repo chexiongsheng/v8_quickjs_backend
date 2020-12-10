@@ -597,6 +597,8 @@ public:
     
     void LowMemoryNotification();
     
+    Local<Value> ThrowException(Local<Value> exception);
+    
     void handleException();
     
     int RegFunctionTemplate(Local<FunctionTemplate> data);
@@ -623,6 +625,8 @@ public:
     
     int value_alloc_pos_ = 0;
     
+    JSValue exception_;
+    
     HandleScope *currentHandleScope = nullptr;
     
     template<class F> F* Alloc() {
@@ -646,6 +650,11 @@ public:
     V8_INLINE Value* Undefined() {
         return reinterpret_cast<Value*>(&literal_values_[kUndefinedValueIndex]);
     }
+};
+
+class V8_EXPORT Exception {
+public:
+    static Local<Value> Error(Local<String> message);
 };
 
 V8_INLINE Local<Primitive> Undefined(Isolate* isolate) {

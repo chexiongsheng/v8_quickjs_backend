@@ -161,6 +161,13 @@ static void MapStaticPropSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     std::cout << "MapStaticPropSet " << info[0]->Int32Value(context).ToChecked() << std::endl;
 }
 
+static void JustThrow(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    
+    isolate->ThrowException(v8::Exception::Error(info[0]->ToString(context).ToLocalChecked()));
+}
+
 static void GetInt64(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
@@ -220,6 +227,10 @@ int main(int argc, char* argv[]) {
         
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "getbigint").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, GetInt64)->GetFunction(context).ToLocalChecked())
+            .Check();
+        
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "justthrow").ToLocalChecked(),
+            v8::FunctionTemplate::New(isolate, JustThrow)->GetFunction(context).ToLocalChecked())
             .Check();
         
         auto base_tpl = v8::FunctionTemplate::New(isolate, NewMap);
@@ -372,36 +383,44 @@ int main(int argc, char* argv[]) {
         
         //exception
         {
-            const char* csource = R"(
+            const char* csource[] = {R"(
                 //throw "abc";
                 new map111();
-              )";
+                )",
+                R"(
+                justthrow('throw???')
+                )"
+            };
 
-            // Create a string containing the JavaScript source code.
-            v8::Local<v8::String> source =
-                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
-                .ToLocalChecked();
-            
-            v8::TryCatch tryCatch(isolate);
+            for(int i = 0; i < 2; i++) {
+                // Create a string containing the JavaScript source code.
+                v8::Local<v8::String> source =
+                    v8::String::NewFromUtf8(isolate, csource[i], v8::NewStringType::kNormal)
+                    .ToLocalChecked();
+                
+                v8::TryCatch tryCatch(isolate);
 
-            // Compile the source code.
-            v8::Local<v8::Script> script =
-                v8::Script::Compile(context, source).ToLocalChecked();
+                // Compile the source code.
+                v8::Local<v8::Script> script =
+                    v8::Script::Compile(context, source).ToLocalChecked();
 
-            // Run the script to get the result.
-            auto ret = script->Run(context);
-            
-            if (tryCatch.HasCaught()) {
-                v8::String::Utf8Value info(isolate, tryCatch.Exception());
-                std::cout << "exception catch, info: " << *info << std::endl;
-                auto msg = tryCatch.Message();
-                std::cout << "fileinfo:" << *v8::String::Utf8Value(isolate, msg->GetScriptResourceName()) << ":" << msg->GetLineNumber(context).ToChecked() << std::endl;
-                v8::Local<v8::Value> stackTrace;
-                if (tryCatch.StackTrace(context).ToLocal(&stackTrace) &&
-                    stackTrace->IsString()) {
-                    v8::String::Utf8Value stack(isolate, stackTrace);
-                    std::cout << "--- " << *stack << std::endl;
+                // Run the script to get the result.
+                auto ret = script->Run(context);
+                
+                std::cout << "---------------exception test " << i << " start------------------" << std::endl;
+                if (tryCatch.HasCaught()) {
+                    v8::String::Utf8Value info(isolate, tryCatch.Exception());
+                    std::cout << "exception catch, info: " << *info << std::endl;
+                    auto msg = tryCatch.Message();
+                    std::cout << "fileinfo:" << *v8::String::Utf8Value(isolate, msg->GetScriptResourceName()) << ":" << msg->GetLineNumber(context).ToChecked() << std::endl;
+                    v8::Local<v8::Value> stackTrace;
+                    if (tryCatch.StackTrace(context).ToLocal(&stackTrace) &&
+                        stackTrace->IsString()) {
+                        v8::String::Utf8Value stack(isolate, stackTrace);
+                        std::cout << "--- " << *stack << std::endl;
+                    }
                 }
+                std::cout << "---------------exception test " << i << " end ------------------" << std::endl;
             }
         }
 

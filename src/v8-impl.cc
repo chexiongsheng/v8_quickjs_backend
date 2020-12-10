@@ -96,6 +96,8 @@ Isolate::Isolate() : current_context_(nullptr) {
     literal_values_[kFalseValueIndex] = JS_False();
     literal_values_[kEmptyStringIndex] = JS_Undefined();
     
+    exception_ = JS_Undefined();
+    
     JSClassDef cls_def;
     cls_def.class_name = "__v8_simulate_obj";
     cls_def.finalizer = V8FinalizerWrap;
@@ -181,6 +183,22 @@ void Isolate::handleException() {
 void Isolate::LowMemoryNotification() {
     Scope isolate_scope(this);
     JS_RunGC(runtime_);
+}
+
+Local<Value> Isolate::ThrowException(Local<Value> exception) {
+    exception_ = exception->value_;
+    this->Escape(*exception);
+    return Local<Value>(exception);
+}
+
+Local<Value> Exception::Error(Local<String> message) {
+    Isolate *isolate = Isolate::current_;
+    Value* val = isolate->Alloc<Value>();
+    JSContext* ctx = isolate->current_context_->context_;
+    val->value_ = JS_NewError(ctx);
+    JS_DefinePropertyValue(ctx, val->value_, JS_ATOM_message, JS_NewString(ctx, *String::Utf8Value(isolate, message)),
+                           JS_PROP_WRITABLE | JS_PROP_CONFIGURABLE);
+    return Local<Value>(val);
 }
 
 void HandleScope::Escape(JSValue* val) {
@@ -661,6 +679,12 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         }
         
         functionTemplate->callback_(callbackInfo);
+        
+        if (!JS_IsUndefined(isolate->exception_)) {
+            JSValue ex = isolate->exception_;
+            isolate->exception_ = JS_Undefined();
+            return JS_Throw(ctx, ex);
+        }
         
         return callbackInfo.isConstructCall ? callbackInfo.this_ : callbackInfo.value_;
     }, "native", 0, isCtor ? JS_CFUNC_constructor_magic : JS_CFUNC_generic_magic, magic_); //TODO: native可以替换成成员函数名
