@@ -44,6 +44,7 @@ class Primitive;
 class Boolean;
 class HandleScope;
 class BigInt;
+template <class T> class PersistentBase;
 
 class V8_EXPORT StartupData {
 public:
@@ -175,6 +176,10 @@ public:
         SetGlobal_(isolate, val, val_);
         val_ = static_cast<T*>(val);
     }
+    
+    V8_INLINE static Local<T> New(Isolate* isolate, const PersistentBase<T>& that) {
+        return that.Get(isolate);
+    }
 
     T* val_;
 };
@@ -224,7 +229,7 @@ public:
     
     V8_INLINE void DecRef(Isolate * isolate) { }
     
-    V8_INLINE void SetGlobal(Value *val) { }
+    V8_INLINE void SetGlobal(Isolate * isolate, Value *val) { }
 };
 
 template <>
@@ -824,7 +829,7 @@ public:
         return val_;
     }
     
-    V8_INLINE bool IsEmpty(Isolate* isolate) const {
+    V8_INLINE bool IsEmpty() const {
         return val_.IsEmpty();
     }
     
