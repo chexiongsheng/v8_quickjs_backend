@@ -111,7 +111,7 @@ Isolate::Isolate() : current_context_(nullptr) {
 };
 
 Isolate::~Isolate() {
-    for (int i = 0; i < values_.size(); i++) {
+    for (size_t i = 0; i < values_.size(); i++) {
         delete values_[i];
     }
     values_.clear();
@@ -121,7 +121,7 @@ Isolate::~Isolate() {
 };
 
 Value* Isolate::Alloc_() {
-    if (value_alloc_pos_ == values_.size()) {
+    if (value_alloc_pos_ == (int)values_.size()) {
         JSValue* node = new JSValue;
         *node = JS_Undefined();
         values_.push_back(node);
