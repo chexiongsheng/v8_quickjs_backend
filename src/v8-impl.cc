@@ -732,15 +732,29 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
 
 Maybe<bool> Object::Set(Local<Context> context,
                         Local<Value> key, Local<Value> value) {
+    bool ok = false;
     if (key->IsNumber()) {
-        JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), value->value_);
+        ok = JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), value->value_);
     } else {
-        JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), value->value_);
+        ok = JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), value->value_);
     }
     
     context->GetIsolate()->Escape(*value);
     
-    return Maybe<bool>(true);
+    return Maybe<bool>(ok);
+}
+
+MaybeLocal<Value> Object::Get(Local<Context> context,
+                      Local<Value> key) {
+    Value* ret = context->GetIsolate()->Alloc<Value>();
+    
+    if (key->IsNumber()) {
+        ret->value_ = JS_GetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked());
+    } else {
+        ret->value_ = JS_GetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_));
+    }
+    
+    return MaybeLocal<Value>(Local<Value>(ret));
 }
 
 void Object::SetAlignedPointerInInternalField(int index, void* value) {

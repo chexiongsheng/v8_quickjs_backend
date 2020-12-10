@@ -558,6 +558,13 @@ int main(int argc, char* argv[]) {
                 std::cout << "date.valueof:" << ret.As<v8::Date>()->ValueOf() << std::endl;
             }
         }
+        //obj.Get
+        {
+            std::cout << "find print? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked()).ToLocalChecked()->IsFunction() << std::endl;
+            std::cout << "find jsfunc? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "jsfunc").ToLocalChecked()).ToLocalChecked()->IsFunction() << std::endl;
+            std::cout << "find gdate? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked()).ToLocalChecked()->IsDate() << std::endl;
+            std::cout << "map111 == undefined? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "map111").ToLocalChecked()).ToLocalChecked()->IsUndefined() << std::endl;
+        }
     }
 
     // Dispose the isolate and tear down V8.

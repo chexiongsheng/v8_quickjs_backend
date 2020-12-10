@@ -482,6 +482,9 @@ public:
     V8_WARN_UNUSED_RESULT Maybe<bool> Set(Local<Context> context,
         Local<Value> key, Local<Value> value);
     
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> Get(Local<Context> context,
+        Local<Value> key);
+    
     void SetAlignedPointerInInternalField(int index, void* value);
     
     void* GetAlignedPointerFromInternalField(int index);
