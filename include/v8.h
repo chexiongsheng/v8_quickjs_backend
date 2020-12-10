@@ -1234,9 +1234,14 @@ public:
         return String::Empty(context->GetIsolate());
     }
     
-    V8_INLINE Maybe<int> GetStartColumn(Local<Context> context) const {
-        return Maybe<int>(0);
+    V8_INLINE int GetStartColumn() const {
+        return 0;
     }
+    
+    V8_INLINE int GetEndColumn() const {
+        return 0;
+    }
+    
     
     std::string resource_name_;
     
