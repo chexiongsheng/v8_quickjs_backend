@@ -636,6 +636,18 @@ public:
     
     HandleScope *currentHandleScope = nullptr;
     
+    void *embedder_data_ = nullptr;
+    
+    V8_INLINE void* GetData(uint32_t slot) {
+        V8::Check(slot == 0, "not supported yet");
+        return embedder_data_;
+    }
+        
+    V8_INLINE void SetData(uint32_t slot, void* data) {
+        V8::Check(slot == 0, "not supported yet");
+        embedder_data_ = data;
+    }
+    
     template<class F> F* Alloc() {
         return static_cast<F*>(Alloc_());
     }
