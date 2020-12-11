@@ -572,8 +572,13 @@ int main(int argc, char* argv[]) {
         //promise
         {
             isolate->SetPromiseRejectCallback([](v8::PromiseRejectMessage message) {
-                std::cout << "event:" << message.GetEvent() << std::endl;
-                std::cout << "reson:" << *v8::String::Utf8Value(message.GetPromise()->GetIsolate(), message.GetValue())  << std::endl;
+                if (message.GetEvent() == v8::kPromiseRejectWithNoHandler) {
+                    std::cout << "kPromiseRejectWithNoHandler:" << *v8::String::Utf8Value(message.GetPromise()->GetIsolate(), message.GetValue())  << std::endl;
+                } else if (message.GetEvent() == v8::kPromiseHandlerAddedAfterReject) {
+                    std::cout << "kPromiseRejectAfterResolved"  << std::endl;
+                } else {
+                    std::cout << "unknw event: " << message.GetEvent() << std::endl;
+                }
             });
             
             const char* csource[] = {R"(
