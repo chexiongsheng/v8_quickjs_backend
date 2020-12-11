@@ -572,6 +572,11 @@ void Template::Set(Isolate* isolate, const char* name, Local<Data> value) {
     fields_[name] = value;
 }
 
+void Template::Set(Local<Name> name, Local<Data> value,
+                   PropertyAttribute attributes) {
+    Isolate* isolate = Isolate::current_;
+    Set(isolate, *String::Utf8Value(Isolate::current_, name), value);
+}
     
 void Template::SetAccessorProperty(Local<Name> name,
                                          Local<FunctionTemplate> getter,

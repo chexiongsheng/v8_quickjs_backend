@@ -1053,6 +1053,10 @@ class V8_EXPORT Template : public Data {
 public:
     void Set(Isolate* isolate, const char* name, Local<Data> value);
     
+    //ignore attributes
+    void Set(Local<Name> name, Local<Data> value,
+             PropertyAttribute attributes = None);
+    
     void SetAccessorProperty(Local<Name> name,
                              Local<FunctionTemplate> getter = Local<FunctionTemplate>(),
                              Local<FunctionTemplate> setter = Local<FunctionTemplate>(),
