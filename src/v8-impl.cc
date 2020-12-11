@@ -339,6 +339,23 @@ Local<String> String::Empty(Isolate* isolate) {
     return Local<String>(reinterpret_cast<String*>(&isolate->literal_values_[kEmptyStringIndex]));
 }
 
+int String::Utf8Length(Isolate* isolate) const {
+    size_t len;
+    const char* p = JS_ToCStringLen(isolate->current_context_->context_, &len, value_);
+    JS_FreeCString(isolate->current_context_->context_, p);
+    return (int)len;
+}
+
+int String::WriteUtf8(Isolate* isolate, char* buffer) const {
+    size_t len;
+    const char* p = JS_ToCStringLen(isolate->current_context_->context_, &len, value_);
+    
+    memcpy(buffer, p, len);
+    
+    JS_FreeCString(isolate->current_context_->context_, p);
+    return (int)len;
+}
+
 //！！如果一个Local<String>用到这个接口了，就不能再传入JS
 MaybeLocal<Script> Script::Compile(
     Local<Context> context, Local<String> source,

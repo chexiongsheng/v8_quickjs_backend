@@ -1011,22 +1011,9 @@ enum class NewStringType {
 
 class V8_EXPORT String : public Name {
 public:
-    /**
-     * Returns the number of bytes in the UTF-8 encoded
-     * representation of this string.
-     */
-    //int Utf8Length(Isolate* isolate) const {
-        //TODO: to be implement
-    //    return 0;
-    //}
+    int Utf8Length(Isolate* isolate) const;
 
-    // UTF-8 encoded characters.
-    //int WriteUtf8(Isolate* isolate, char* buffer, int length = -1,
-    //            int* nchars_ref = nullptr) const {
-    //    size_t size;
-    //
-    //    return 0;
-    //}
+    int WriteUtf8(Isolate* isolate, char* buffer) const;
 
     static Local<String> Empty(Isolate* isolate);
 
