@@ -571,6 +571,15 @@ public:
     }
 };
 
+class V8_EXPORT Promise : public Object {
+public:
+    V8_INLINE static Promise* Cast(Value* obj) {
+        return static_cast<Promise*>(obj);
+    }
+    
+    Isolate* GetIsolate();
+};
+
 enum {
     kUndefinedValueIndex = 0,
     kNullValueIndex = 1,
@@ -578,6 +587,31 @@ enum {
     kFalseValueIndex = 3,
     kEmptyStringIndex = 4,
 } LiteralIndex;
+
+enum PromiseRejectEvent {
+    kPromiseRejectWithNoHandler = 0,
+    kPromiseHandlerAddedAfterReject = 1,
+    kPromiseRejectAfterResolved = 2,
+    kPromiseResolveAfterResolved = 3,
+};
+
+class PromiseRejectMessage {
+public:
+    PromiseRejectMessage(JSValue promise, PromiseRejectEvent event,
+                         JSValue value)
+        : promise_(promise), event_(event), value_(value) {}
+
+    V8_INLINE Local<Promise> GetPromise() const { return Local<Promise>( reinterpret_cast<Promise*>(const_cast<JSValue*>(&promise_))) ; }
+    V8_INLINE PromiseRejectEvent GetEvent() const { return event_; }
+    V8_INLINE Local<Value> GetValue() const { return Local<Value>( reinterpret_cast<Value*>(const_cast<JSValue*>(&value_))) ;}
+
+private:
+    JSValue promise_;
+    PromiseRejectEvent event_;
+    JSValue value_;
+};
+
+typedef void (*PromiseRejectCallback)(PromiseRejectMessage message);
 
 class V8_EXPORT Isolate {
 public:
@@ -623,6 +657,8 @@ public:
     void LowMemoryNotification();
     
     Local<Value> ThrowException(Local<Value> exception);
+    
+    void SetPromiseRejectCallback(PromiseRejectCallback callback);
     
     void handleException();
     

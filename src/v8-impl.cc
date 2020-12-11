@@ -77,6 +77,10 @@ bool Value::IsSymbol() const {
     return JS_IsSymbol(value_);
 }
 
+Isolate* Promise::GetIsolate() {
+    return Isolate::current_;
+}
+
 void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
     ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val));
     if (objectUdata) {
@@ -189,6 +193,15 @@ Local<Value> Isolate::ThrowException(Local<Value> exception) {
     exception_ = exception->value_;
     this->Escape(*exception);
     return Local<Value>(exception);
+}
+
+void Isolate::SetPromiseRejectCallback(PromiseRejectCallback cb) {
+    JS_SetHostPromiseRejectionTracker(runtime_, [](JSContext *ctx, JSValueConst promise,
+                                                   JSValueConst reason,
+                                                   JS_BOOL is_handled, void *opaque) {
+        PromiseRejectCallback callback = (PromiseRejectCallback)opaque;
+        callback(PromiseRejectMessage(promise, is_handled ? kPromiseHandlerAddedAfterReject : kPromiseRejectWithNoHandler,  reason));
+    }, (void*)cb);
 }
 
 Local<Value> Exception::Error(Local<String> message) {

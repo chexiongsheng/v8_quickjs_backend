@@ -393,7 +393,7 @@ int main(int argc, char* argv[]) {
                 )"
             };
 
-            for(int i = 0; i < 2; i++) {
+            for(int i = 0; i < sizeof(csource)/sizeof(csource[0]); i++) {
                 // Create a string containing the JavaScript source code.
                 v8::Local<v8::String> source =
                     v8::String::NewFromUtf8(isolate, csource[i], v8::NewStringType::kNormal)
@@ -567,6 +567,41 @@ int main(int argc, char* argv[]) {
             std::cout << "map111 == undefined? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "map111").ToLocalChecked()).ToLocalChecked()->IsUndefined() << std::endl;
             std::cout << "find patt? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "patt").ToLocalChecked()).ToLocalChecked()->IsRegExp() << std::endl;
             std::cout << "gdate is regexp ? " << context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gdate").ToLocalChecked()).ToLocalChecked()->IsRegExp() << std::endl;
+        }
+        
+        //promise
+        {
+            isolate->SetPromiseRejectCallback([](v8::PromiseRejectMessage message) {
+                std::cout << "event:" << message.GetEvent() << std::endl;
+                std::cout << "reson:" << *v8::String::Utf8Value(message.GetPromise()->GetIsolate(), message.GetValue())  << std::endl;
+            });
+            
+            const char* csource[] = {R"(
+                new Promise((resolve, reject)=>{
+                    throw 'unhandled rejection'
+                })
+            )", R"(
+                new Promise((resolve, reject)=>{
+                    throw 'unhandled rejection'
+                }).catch(error => {
+                })
+            )"};
+
+            for(int i = 0; i < sizeof(csource)/sizeof(csource[0]); i++) {
+                std::cout << "---------------promise test " << i << " start------------------" << std::endl;
+                // Create a string containing the JavaScript source code.
+                v8::Local<v8::String> source =
+                    v8::String::NewFromUtf8(isolate, csource[i], v8::NewStringType::kNormal)
+                    .ToLocalChecked();
+
+                // Compile the source code.
+                v8::Local<v8::Script> script =
+                    v8::Script::Compile(context, source).ToLocalChecked();
+
+                // Run the script to get the result.
+                auto ret = script->Run(context).ToLocalChecked();
+                std::cout << "---------------promise test " << i << " end------------------" << std::endl;
+            }
         }
     }
 
