@@ -891,7 +891,6 @@ public:
         this->weak_ = other.weak_;
         this->val_.SetGlobal(this->isolate_, reinterpret_cast<Value*>(&this->store_));
         
-        other.val_ = nullptr;
         other.weak_ = true;
         other.isolate_ = nullptr;
     }
