@@ -812,7 +812,7 @@ public:
         static_assert(std::is_base_of<T, S>::value, "type check");
         Reset();
         isolate_ = isolate;
-        val_ = Local<T>::Cast(other);
+        val_ = other;
         val_.SetGlobal(isolate, reinterpret_cast<Value*>(&store_));
         if (!val_.IsEmpty() && val_.SupportWeak()) {
             val_.IncRef(isolate_);
@@ -867,7 +867,7 @@ public:
           this->Reset();
           if (!rhs.val_.IsEmpty()) {
               this->isolate_ = rhs.isolate_;
-              this->val_ = Local<T>::Cast(rhs.val_);
+              this->val_ = rhs.val_;
               this->weak_ = rhs.weak_;
               this->val_.SetGlobal(this->isolate_, reinterpret_cast<Value*>(&(this->store_)));
               
