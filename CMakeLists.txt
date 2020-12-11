@@ -44,15 +44,19 @@ include_directories(
 )
 
 if ( MSYS )
-add_library(quickjs SHARED ${SRC_FILES})
-target_compile_definitions(quickjs PRIVATE
+    if ( WIN_DLL )
+        add_library(quickjs SHARED ${SRC_FILES})
+    else ()
+        add_library(quickjs STATIC ${SRC_FILES})
+    endif()
+    target_compile_definitions(quickjs PRIVATE
         _GNU_SOURCE
         CONFIG_BIGNUM
         CONFIG_VERSION="\\\"${QJS_VERSION_STR}\\\""
         )
 else()
-add_library(quickjs STATIC ${SRC_FILES})
-target_compile_definitions(quickjs PRIVATE
+    add_library(quickjs STATIC ${SRC_FILES})
+    target_compile_definitions(quickjs PRIVATE
         _GNU_SOURCE
         CONFIG_BIGNUM
         CONFIG_VERSION="${QJS_VERSION_STR}"
