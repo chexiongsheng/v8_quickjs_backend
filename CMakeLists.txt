@@ -30,7 +30,7 @@ set(SRC_FILES
         quickjs/quickjs.c
         src/quickjs-wrap.c
         )
-if ( ANDROID OR APPLE )
+if ( ANDROID OR APPLE OR (MSYS AND NOT WIN_DLL) )
     list(APPEND SRC_FILES src/v8-impl.cc)
 endif()
 
