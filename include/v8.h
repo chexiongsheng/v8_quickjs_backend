@@ -1178,7 +1178,9 @@ public:
 template<typename T>
 class FunctionCallbackInfo {
 public:
-    V8_INLINE int Length() const;
+    V8_INLINE int Length() const {
+        return argc_;
+    }
     
     V8_INLINE Local<Value> operator[](int i) const;
     
