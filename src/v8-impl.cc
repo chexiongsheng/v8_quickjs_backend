@@ -82,6 +82,8 @@ Isolate* Promise::GetIsolate() {
 }
 
 void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
+    Isolate* isolate = (Isolate*)JS_GetRuntimeOpaque(rt);
+    v8::Isolate::Scope Isolatescope(isolate);
     ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val));
     if (objectUdata) {
         if (objectUdata->callback_) {
@@ -94,6 +96,7 @@ void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
 
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
+    JS_SetRuntimeOpaque(runtime_, this);
     literal_values_[kUndefinedValueIndex] = JS_Undefined();
     literal_values_[kNullValueIndex] = JS_Null();
     literal_values_[kTrueValueIndex] = JS_True();
