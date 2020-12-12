@@ -725,7 +725,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     if (iter != context_to_funtion_.end()) {
         return iter->second.Get(context->GetIsolate());
     }
-    bool isCtor = !prototype_template_.IsEmpty();
+    is_construtor_ = !prototype_template_.IsEmpty() || !instance_template_.IsEmpty() || fields_.size() > 0 || accessor_property_infos_.size() > 0 || !parent_.IsEmpty();
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
         Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
         Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
@@ -737,7 +737,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         callbackInfo.this_ = this_val;
         callbackInfo.magic_ = magic;
         callbackInfo.value_ = JS_Undefined();
-        callbackInfo.isConstructCall = !functionTemplate->instance_template_.IsEmpty();
+        callbackInfo.isConstructCall = functionTemplate->is_construtor_;
         
         if (callbackInfo.isConstructCall && functionTemplate->instance_template_->internal_field_count_ > 0) {
             JSValue proto = JS_GetProperty(ctx, this_val, JS_ATOM_prototype);
@@ -759,11 +759,11 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         }
         
         return callbackInfo.isConstructCall ? callbackInfo.this_ : callbackInfo.value_;
-    }, "native", 0, isCtor ? JS_CFUNC_constructor_magic : JS_CFUNC_generic_magic, magic_); //TODO: native可以替换成成员函数名
+    }, "native", 0, is_construtor_ ? JS_CFUNC_constructor_magic : JS_CFUNC_generic_magic, magic_); //TODO: native可以替换成成员函数名
     
-    if (isCtor) {
+    if (is_construtor_) {
         JSValue proto = JS_NewObject(context->context_);
-        prototype_template_->InitPropertys(context, proto);
+        if (!prototype_template_.IsEmpty()) prototype_template_->InitPropertys(context, proto);
         InitPropertys(context, func);
         JS_SetConstructor(context->context_, func, proto);
         JS_FreeValue(context->context_, proto);

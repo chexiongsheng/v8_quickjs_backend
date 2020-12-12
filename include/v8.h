@@ -1129,6 +1129,7 @@ public:
     int magic_;
     FunctionCallback callback_;
     JSValue data_;
+    bool is_construtor_ = false;
     
     Local<ObjectTemplate> instance_template_;
     Local<ObjectTemplate> prototype_template_;
