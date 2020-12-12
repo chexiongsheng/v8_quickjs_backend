@@ -215,7 +215,9 @@ Local<Value> Exception::Error(Local<String> message) {
 }
 
 void HandleScope::Escape(JSValue* val) {
-    escapes_.insert(val);
+    if (JS_VALUE_HAS_REF_COUNT(*val)) {
+        escapes_.insert(val);
+    }
 }
 
 void HandleScope::Exit() {

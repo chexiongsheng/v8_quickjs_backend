@@ -91,6 +91,8 @@ public:
     }
 };
 
+Value* AllocValue_(Isolate * isolate);
+
 void IncRef_(Isolate * isolate, JSValue val);
 
 void DecRef_(Isolate * isolate, JSValue val);
@@ -158,6 +160,13 @@ public:
     
     V8_INLINE bool SupportWeak() {
         return !IsEmpty();
+    }
+    
+    V8_INLINE Local<T> Clone(Isolate * isolate) const {
+        T* ret = static_cast<T*>(AllocValue_(isolate));
+        ret->value_ = val_->value_;
+        return Local<T>(ret);
+        //return *this;
     }
     
     V8_INLINE void IncRef(Isolate * isolate) {
@@ -240,6 +249,10 @@ public:
     V8_INLINE Local(const Local<Context> &that) : LocalSharedPtrImpl(that) { }
     
     explicit V8_INLINE Local(Context* that) : LocalSharedPtrImpl(that) {}
+    
+    V8_INLINE Local<Context> Clone(Isolate * isolate) const {
+        return *this;
+    }
 };
 
 template <>
@@ -293,6 +306,10 @@ public:
     V8_INLINE Local(const Local<FunctionTemplate> &that): LocalSharedPtrImpl(that) { }
 
     explicit V8_INLINE Local(FunctionTemplate* that) : LocalSharedPtrImpl(that) { }
+    
+    V8_INLINE Local<FunctionTemplate> Clone(Isolate * isolate) const {
+        return *this;
+    }
 };
 
 template <>
@@ -785,6 +802,10 @@ public:
     Context(Isolate* isolate);
 };
 
+V8_INLINE Value* AllocValue_(Isolate * isolate) {
+    return isolate->Alloc_();
+}
+
 V8_INLINE void IncRef_(Isolate * isolate, JSValue val) {
     JS_DupValueRT(isolate->runtime_, val);
 }
@@ -862,7 +883,9 @@ public:
     JSValue store_;
     
     V8_INLINE Local<T> Get(Isolate* isolate) const {
-        return val_;
+        Local<T> ret = val_.Clone(isolate);
+        ret.IncRef(isolate);
+        return ret;
     }
     
     V8_INLINE bool IsEmpty() const {
