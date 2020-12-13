@@ -414,7 +414,9 @@ void* External::Value() const {
 }
 
 double Number::Value() const {
-    return JS_VALUE_GET_FLOAT64(value_);
+    double ret;
+    JS_ToFloat64(Isolate::current_->current_context_->context_, &ret, value_);
+    return ret;
 }
 
 Local<Number> Number::New(Isolate* isolate, double value) {
