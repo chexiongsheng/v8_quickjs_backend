@@ -704,6 +704,7 @@ Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback
         functionTemplate->data_ = data->value_;
     }
     functionTemplate->magic_ = isolate->RegFunctionTemplate(functionTemplate);
+    functionTemplate->isolate_ = isolate;
     return functionTemplate;
 }
 
@@ -728,7 +729,10 @@ Local<ObjectTemplate> FunctionTemplate::PrototypeTemplate() {
 MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     auto iter = context_to_funtion_.find(*context);
     if (iter != context_to_funtion_.end()) {
-        return iter->second.Get(context->GetIsolate());
+        Function* ret = isolate_->Alloc<Function>();
+        ret->value_ = iter->second;
+        JS_DupValueRT(isolate_->runtime_, ret->value_);
+        return MaybeLocal<Function>(Local<Function>(ret));
     }
     is_construtor_ = !prototype_template_.IsEmpty() || !instance_template_.IsEmpty() || fields_.size() > 0 || accessor_property_infos_.size() > 0 || !parent_.IsEmpty();
     JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
@@ -786,9 +790,16 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     
     Local<Function> ret(function);
     
-    context_to_funtion_[*context] = Global<Function>(context->GetIsolate(), ret);
+    context_to_funtion_[*context] = func;
+    JS_DupValueRT(isolate_->runtime_, func);
     
     return MaybeLocal<Function>(ret);
+}
+
+FunctionTemplate::~FunctionTemplate() {
+    for(auto it : context_to_funtion_) {
+        JS_FreeValueRT(isolate_->runtime_, it.second);
+    }
 }
 
 Maybe<bool> Object::Set(Local<Context> context,

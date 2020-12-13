@@ -603,7 +603,7 @@ enum {
     kTrueValueIndex = 2,
     kFalseValueIndex = 3,
     kEmptyStringIndex = 4,
-} LiteralIndex;
+};
 
 enum PromiseRejectEvent {
     kPromiseRejectWithNoHandler = 0,
@@ -1154,11 +1154,15 @@ public:
     JSValue data_;
     bool is_construtor_ = false;
     
+    Isolate* isolate_;
+    
     Local<ObjectTemplate> instance_template_;
     Local<ObjectTemplate> prototype_template_;
     Local<FunctionTemplate> parent_;
     
-    std::map<Context*, Global<Function>> context_to_funtion_;
+    std::map<Context*, JSValue> context_to_funtion_;
+    
+    ~FunctionTemplate();
 };
 
 template<typename T>
