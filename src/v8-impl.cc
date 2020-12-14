@@ -388,10 +388,6 @@ MaybeLocal<Value> Script::Run(Local<Context> context) {
     String::Utf8Value source(isolate, source_);
     const char *filename = resource_name_.IsEmpty() ? "eval" : *String::Utf8Value(isolate, resource_name_.ToLocalChecked());
     auto ret = JS_Eval(context->context_, *source, source.length(), filename, JS_EVAL_TYPE_GLOBAL);
-    while (JS_IsJobPending(isolate->runtime_)) {
-        JSContext *ctx = nullptr;
-        JS_ExecutePendingJob(isolate->runtime_, &ctx);
-    }
 
     return ProcessResult(isolate, ret);
 }

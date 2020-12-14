@@ -778,16 +778,29 @@ public:
 
     class Scope {
     public:
-        explicit V8_INLINE Scope(Local<Context> context) : context_(context), prev_context_(nullptr) {
-            prev_context_ = context->isolate_->current_context_;
-            context->isolate_->current_context_ = context_;
+        explicit V8_INLINE Scope(Local<Context> context) {
+            isolate_ = context->GetIsolate();
+            if (*(context) != *(isolate_->current_context_)) {
+                prev_context_ = isolate_->current_context_;
+                isolate_->current_context_ = context;
+                enter_new_ = true;
+            } else {
+                enter_new_ = false;
+            }
         }
         V8_INLINE ~Scope() {
-            context_->isolate_->current_context_ = prev_context_;
+            if (enter_new_) {
+                while (JS_IsJobPending(isolate_->runtime_)) {
+                    JSContext *ctx = nullptr;
+                    JS_ExecutePendingJob(isolate_->runtime_, &ctx);
+                }
+                isolate_->current_context_ = prev_context_;
+            }
         }
 
     private:
-        Local<Context> context_;
+        bool enter_new_;
+        Isolate* isolate_;
         Local<Context> prev_context_;
     };
 
