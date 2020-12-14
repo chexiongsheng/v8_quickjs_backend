@@ -73,7 +73,7 @@
 
 #if !defined(EMSCRIPTEN)
 /* enable stack limitation */
-#define CONFIG_STACK_CHECK
+//#define CONFIG_STACK_CHECK
 #endif
 
 
