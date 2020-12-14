@@ -580,7 +580,7 @@ MaybeLocal<Value> Function::Call(Local<Context> context,
     JSValue *js_this = reinterpret_cast<JSValue*>(recv.IsEmpty() ? isolate->Undefined() : (*recv));
     JSValue *js_argv = (JSValue*)alloca(argc * sizeof(JSValue));
     for(int i = 0 ; i < argc; i++) {
-        isolate->Escape(*argv[i]);
+        //isolate->Escape(*argv[i]);
         js_argv[i] = argv[i]->value_;
     }
     JSValue ret = JS_Call(context->context_, value_, *js_this, argc, js_argv);
@@ -592,7 +592,7 @@ MaybeLocal<Object> Function::NewInstance(Local<Context> context, int argc, Local
     Isolate *isolate = context->GetIsolate();
     JSValue *js_argv = (JSValue*)alloca(argc * sizeof(JSValue));
     for(int i = 0 ; i < argc; i++) {
-        isolate->Escape(*argv[i]);
+        //isolate->Escape(*argv[i]);
         js_argv[i] = argv[i]->value_;
     }
     
@@ -631,6 +631,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
         context->GetIsolate()->Escape(*lfunc);
         JS_DefinePropertyValue(context->context_, obj, atom, lfunc->value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
+        JS_FreeAtom(context->context_, atom);
     }
     
     for (auto it : accessor_property_infos_) {
@@ -695,6 +696,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         }
         JSAtom atom = JS_NewAtom(context->context_, name.c_str());
         JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
+        JS_FreeAtom(context->context_, atom);
         JS_FreeValue(context->context_, getter);
         JS_FreeValue(context->context_, setter);
     }
@@ -819,7 +821,9 @@ Maybe<bool> Object::Set(Local<Context> context,
     if (key->IsNumber()) {
         ok = JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), value->value_);
     } else {
-        ok = JS_SetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_), value->value_);
+        JSAtom atom = JS_ValueToAtom(context->context_, key->value_);
+        ok = JS_SetProperty(context->context_, value_, atom, value->value_);
+        JS_FreeAtom(context->context_, atom);
     }
     
     context->GetIsolate()->Escape(*value);
@@ -834,7 +838,9 @@ MaybeLocal<Value> Object::Get(Local<Context> context,
     if (key->IsNumber()) {
         ret->value_ = JS_GetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked());
     } else {
-        ret->value_ = JS_GetProperty(context->context_, value_, JS_ValueToAtom(context->context_, key->value_));
+        JSAtom atom = JS_ValueToAtom(context->context_, key->value_);
+        ret->value_ = JS_GetProperty(context->context_, value_, atom);
+        JS_FreeAtom(context->context_, atom);
     }
     
     return MaybeLocal<Value>(Local<Value>(ret));
@@ -842,6 +848,7 @@ MaybeLocal<Value> Object::Get(Local<Context> context,
 
 void Object::SetAlignedPointerInInternalField(int index, void* value) {
     ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(value_));
+    //if (index == 0) std::cout << "SetAlignedPointerInInternalField, value:" << value << ", objptr:" << JS_VALUE_GET_PTR(value_) << std::endl;
     if (!objectUdata || index >= objectUdata->len_) {
         std::cerr << "SetAlignedPointerInInternalField";
         if (objectUdata) {
