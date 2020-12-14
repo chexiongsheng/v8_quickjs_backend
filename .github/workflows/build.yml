@@ -12,6 +12,7 @@ jobs:
     - name: Run build script
       run: |
         ./make_osx.sh
+        cp -r include ~/qjs/Inc
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
