@@ -640,7 +640,14 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
     for (auto it : accessor_property_infos_) {
         JSValue getter = JS_Undefined();
         JSValue setter = JS_Undefined();
-        int flag = JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE;
+        int flag = 0;
+        if (!(it.second.attribute_ & DontDelete)) {
+            flag |= JS_PROP_CONFIGURABLE;
+        }
+        if (!(it.second.attribute_ & DontEnum)) {
+            flag |= JS_PROP_ENUMERABLE;
+        }
+        
         std::string name = it.first;
         if (!it.second.getter_.IsEmpty()) {
             flag |= JS_PROP_HAS_GET;
@@ -665,7 +672,8 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
             std::string getter_name = "get " + name;
             getter = JS_NewCFunction2(context->context_, pfunc.generic, getter_name.c_str(), 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);
         }
-        if (!it.second.setter_.IsEmpty()) {
+        
+        if (!(it.second.attribute_ & ReadOnly) && !it.second.setter_.IsEmpty()) {
             JSCFunctionType pfunc;
             flag |= JS_PROP_HAS_SET;
             flag |= JS_PROP_WRITABLE;
