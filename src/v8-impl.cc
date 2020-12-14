@@ -320,11 +320,7 @@ V8_WARN_UNUSED_RESULT MaybeLocal<Object> Value::ToObject(Local<Context> context)
 }
 
 V8_WARN_UNUSED_RESULT Maybe<double> Value::NumberValue(Local<Context> context) const {
-    if (IsNumber()) {
-        return Maybe<double>(Number::Cast(const_cast<Value*>(this))->Value());
-    } else {
-        return Maybe<double>();
-    }
+    return Maybe<double>(Number::Cast(const_cast<Value*>(this))->Value());
 }
 
 MaybeLocal<String> String::NewFromUtf8(
