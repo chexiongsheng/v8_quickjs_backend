@@ -121,8 +121,7 @@ jobs:
         mkdir -p qjs/Lib/Win32/
         cp win/quickjs.dll.lib qjs/Lib/Win32/
         cp build/msys-quickjs.dll qjs/Lib/Win32/
-        cp /mingw32/bin/libgcc_s_seh-1.dll qjs/Lib/Win32/
-        cp /mingw32/bin/libwinpthread-1.dll qjs/Lib/Win32/
+        ls /mingw32/bin/
     - uses: actions/upload-artifact@v2
       with:
         name: qjs_v8
