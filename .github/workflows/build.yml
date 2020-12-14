@@ -77,7 +77,7 @@ jobs:
         cd win
         LIB.EXE /OUT:quickjs.dll.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
     - name: Prepare
-      shell: bash
+      shell: msys2 {0}
       run: |
         mkdir -p qjs/Lib/Win64/
         cp win/quickjs.dll.lib qjs/Lib/Win64/
@@ -116,7 +116,7 @@ jobs:
         cd win
         LIB.EXE /OUT:quickjs.dll.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
     - name: Prepare
-      shell: bash
+      shell: msys2 {0}
       run: |
         mkdir -p qjs/Lib/Win32/
         cp win/quickjs.dll.lib qjs/Lib/Win32/
