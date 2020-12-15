@@ -89,6 +89,12 @@ public:
             abort();
         }
     }
+    
+    V8_INLINE static void SetFlagsFromString(const char* str) {
+    }
+    
+    V8_INLINE static void SetFlagsFromString(const char* str, size_t length) {
+    }
 };
 
 Value* AllocValue_(Isolate * isolate);
