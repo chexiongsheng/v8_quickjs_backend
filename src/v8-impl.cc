@@ -626,7 +626,7 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         Local<FunctionTemplate> funcTpl = Local<FunctionTemplate>::Cast(it.second);
         Local<Function> lfunc = funcTpl->GetFunction(context).ToLocalChecked();
         context->GetIsolate()->Escape(*lfunc);
-        JS_DefinePropertyValue(context->context_, obj, atom, lfunc->value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
+        JS_DefinePropertyValue(context->context_, obj, atom, lfunc->value_, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE | JS_PROP_WRITABLE);
         JS_FreeAtom(context->context_, atom);
     }
     
