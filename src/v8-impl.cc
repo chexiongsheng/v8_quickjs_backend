@@ -32,28 +32,22 @@ std::unique_ptr<v8::Platform> NewDefaultPlatform() {
 namespace v8 {
 
 Maybe<uint32_t> Value::Uint32Value(Local<Context> context) const {
-    int tag = JS_VALUE_GET_TAG(value_);
-    if (tag == JS_TAG_INT) {
-        return Maybe<uint32_t>((uint32_t)JS_VALUE_GET_INT(value_));
-    }
-    else if (tag == JS_TAG_FLOAT64){
-        return Maybe<uint32_t>((uint32_t)JS_VALUE_GET_FLOAT64(value_));
+    double d;
+    if (JS_ToFloat64(Isolate::current_->current_context_->context_, &d, value_)) {
+        return Maybe<uint32_t>();
     }
     else {
-        return Maybe<uint32_t>();
+        return Maybe<uint32_t>((uint32_t)d);
     }
 }
     
 Maybe<int32_t> Value::Int32Value(Local<Context> context) const {
-    int tag = JS_VALUE_GET_TAG(value_);
-    if (tag == JS_TAG_INT) {
-        return Maybe<int32_t>((int32_t)JS_VALUE_GET_INT(value_));
-    }
-    else if (tag == JS_TAG_FLOAT64){
-        return Maybe<int32_t>((int32_t)JS_VALUE_GET_FLOAT64(value_));
+    double d;
+    if (JS_ToFloat64(Isolate::current_->current_context_->context_, &d, value_)) {
+        return Maybe<int32_t>();
     }
     else {
-        return Maybe<int32_t>();
+        return Maybe<int32_t>((int32_t)d);
     }
 }
     
