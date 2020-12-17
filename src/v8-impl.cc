@@ -654,6 +654,12 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
                 
                 functionTemplate->callback_(callbackInfo);
                 
+                if (!JS_IsUndefined(isolate->exception_)) {
+                    JSValue ex = isolate->exception_;
+                    isolate->exception_ = JS_Undefined();
+                    return JS_Throw(ctx, ex);
+                }
+                
                 return callbackInfo.value_;
             };
             std::string getter_name = "get " + name;
@@ -678,6 +684,12 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
                 callbackInfo.isConstructCall = false;
                 
                 functionTemplate->callback_(callbackInfo);
+                
+                if (!JS_IsUndefined(isolate->exception_)) {
+                    JSValue ex = isolate->exception_;
+                    isolate->exception_ = JS_Undefined();
+                    return JS_Throw(ctx, ex);
+                }
                 
                 return callbackInfo.value_;
             };
