@@ -159,6 +159,7 @@ static void MapStaticPropSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     
     std::cout << "MapStaticPropSet " << info[0]->Int32Value(context).ToChecked() << std::endl;
+    isolate->ThrowException(v8::Exception::Error(info[0]->ToString(context).ToLocalChecked()));
 }
 
 static void JustThrow(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -344,7 +345,6 @@ int main(int argc, char* argv[]) {
             
                 map.static(1024);
                 print(map.sprop);
-                map.sprop = 888;
                 m = undefined;
                 
                 print(g_map.count);
@@ -387,9 +387,16 @@ int main(int argc, char* argv[]) {
             const char* csource[] = {R"(
                 //throw "abc";
                 new map111();
+                print('!!!!!must not be print');
                 )",
                 R"(
-                justthrow('throw???')
+                justthrow('throw???');
+                print('!!!!!must not be print');
+                )"
+                ,
+                R"(
+                map.sprop = 888;
+                print('!!!!!must not be print');
                 )"
             };
 
@@ -405,10 +412,10 @@ int main(int argc, char* argv[]) {
                 v8::Local<v8::Script> script =
                     v8::Script::Compile(context, source).ToLocalChecked();
 
+                std::cout << "---------------exception test " << i << " start------------------" << std::endl;
                 // Run the script to get the result.
                 auto ret = script->Run(context);
                 
-                std::cout << "---------------exception test " << i << " start------------------" << std::endl;
                 if (tryCatch.HasCaught()) {
                     v8::String::Utf8Value info(isolate, tryCatch.Exception());
                     std::cout << "exception catch, info: " << *info << std::endl;
