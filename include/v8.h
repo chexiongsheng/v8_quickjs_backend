@@ -45,6 +45,7 @@ class Boolean;
 class HandleScope;
 class BigInt;
 template <class T> class PersistentBase;
+class Number;
 
 class V8_EXPORT StartupData {
 public:
@@ -496,6 +497,9 @@ public:
     bool IsInt32() const;
     
     V8_WARN_UNUSED_RESULT MaybeLocal<BigInt> ToBigInt(
+        Local<Context> context) const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(
         Local<Context> context) const;
     
     bool BooleanValue(Isolate* isolate) const;

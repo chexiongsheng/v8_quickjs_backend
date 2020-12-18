@@ -295,6 +295,21 @@ MaybeLocal<BigInt> Value::ToBigInt(Local<Context> context) const {
     }
 }
 
+MaybeLocal<Number> Value::ToNumber(Local<Context> context) const {
+    if (IsNumber()) {
+        return MaybeLocal<Number>(Local<Number>(static_cast<Number*>(const_cast<Value*>(this))));
+    }
+    else {
+        double d;
+        if (JS_ToFloat64(context->context_, &d, value_)) {
+            return MaybeLocal<Number>();
+        }
+        else {
+            return Number::New(context->GetIsolate(), d);
+        }
+    }
+}
+
 bool Value::BooleanValue(Isolate* isolate) const {
     return JS_ToBool(isolate->current_context_->context_, value_);
 }
