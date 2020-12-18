@@ -1290,6 +1290,8 @@ public:
         
         prev_scope_ = isolate->currentHandleScope;
         isolate->currentHandleScope = this;
+        
+        scope_value_ = JS_Undefined();
     }
 
     V8_INLINE ~HandleScope() {
@@ -1297,21 +1299,38 @@ public:
         isolate_->currentHandleScope = prev_scope_;
     }
     
-    void Escape(JSValue* val);
+    void Escape_(JSValue* val);
     
     void Exit();
 
-private:
-    void* operator new(size_t size);
-    void* operator new[](size_t size);
-    void operator delete(void*, size_t);
-    void operator delete[](void*, size_t);
-    
     int prev_pos_;
     Isolate* isolate_;
     HandleScope* prev_scope_;
     
     std::set<JSValue*> escapes_;
+    
+    JSValue scope_value_;
+    
+private:
+    void* operator new(size_t size);
+    void* operator new[](size_t size);
+    void operator delete(void*, size_t);
+    void operator delete[](void*, size_t);
+};
+
+class V8_EXPORT EscapableHandleScope : public HandleScope {
+public:
+    V8_INLINE explicit EscapableHandleScope(Isolate* isolate) : HandleScope(isolate) {
+    }
+    
+    template <class T>
+    V8_INLINE Local<T> Escape(Local<T> value) {
+        V8::Check(prev_scope_ != nullptr, "no prev scope to escape");
+        T* pval = *value;
+        Escape_(reinterpret_cast<JSValue*>(pval));
+        prev_scope_->scope_value_ = pval->value_;
+        return Local<T>(reinterpret_cast<T*>(&prev_scope_->scope_value_));
+    }
 };
 
 class V8_EXPORT Script : Data {

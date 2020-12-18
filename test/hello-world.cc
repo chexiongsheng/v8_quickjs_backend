@@ -188,6 +188,17 @@ static void GetInt64(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(ret);
 }
 
+static v8::Local<v8::Value> NewStringScope(v8::Isolate* isolate) {
+    //v8::HandleScope handle_scope(isolate); //expect crash
+    //return v8::String::NewFromUtf8(isolate, "NewStringScope").ToLocalChecked();
+    v8::EscapableHandleScope handle_scope(isolate);
+    return handle_scope.Escape(v8::String::NewFromUtf8(isolate, "NewStringScope").ToLocalChecked());
+}
+
+static void TestScope(const v8::FunctionCallbackInfo<v8::Value>& info) {
+    info.GetReturnValue().Set(NewStringScope(info.GetIsolate()));
+}
+
 int main(int argc, char* argv[]) {
     // Initialize V8.
     v8::StartupData SnapshotBlob;
@@ -222,9 +233,9 @@ int main(int argc, char* argv[]) {
             v8::FunctionTemplate::New(isolate, Add, external)->GetFunction(context).ToLocalChecked())
             .Check();
 
-        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked(),
-            v8::FunctionTemplate::New(isolate, Print)->GetFunction(context).ToLocalChecked())
-            .Check();
+        auto print = v8::FunctionTemplate::New(isolate, Print)->GetFunction(context).ToLocalChecked();
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked(), print).Check();
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "print").ToLocalChecked(), print).Check();//一个local变量多次Set
         
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "getbigint").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, GetInt64)->GetFunction(context).ToLocalChecked())
@@ -232,6 +243,10 @@ int main(int argc, char* argv[]) {
         
         context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "justthrow").ToLocalChecked(),
             v8::FunctionTemplate::New(isolate, JustThrow)->GetFunction(context).ToLocalChecked())
+            .Check();
+        
+        context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "testscope").ToLocalChecked(),
+            v8::FunctionTemplate::New(isolate, TestScope)->GetFunction(context).ToLocalChecked())
             .Check();
         
         auto base_tpl = v8::FunctionTemplate::New(isolate, NewMap);
@@ -614,6 +629,33 @@ int main(int argc, char* argv[]) {
                 auto ret = script->Run(context).ToLocalChecked();
                 std::cout << "---------------promise test " << i << " end------------------" << std::endl;
             }
+        }
+        
+        //date
+        {
+            const char* csource = R"(
+                print(testscope());
+                /*let ooo = new map();
+                let ppp = Object.getOwnPropertyDescriptor(map.prototype, 'count')
+                let j =0;
+                for(var i in ppp) {
+                    print(`-----------------------${j++}--------------------------`)
+                    print(i);
+                    print(ppp[i]);
+                }*/
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            auto ret = script->Run(context).ToLocalChecked();
         }
     }
 

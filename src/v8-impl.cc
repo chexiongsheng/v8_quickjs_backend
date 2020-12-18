@@ -143,7 +143,7 @@ void Isolate::ForeachAllocValue(int start, int end, std::function<void(JSValue*,
 
 void Isolate::Escape(JSValue* val) {
     V8::Check(currentHandleScope, "try to escape a scope, but no scope register!");
-    currentHandleScope->Escape(val);
+    currentHandleScope->Escape_(val);
 }
 
 Isolate* Isolate::current_ = nullptr;
@@ -211,9 +211,14 @@ Local<Value> Exception::Error(Local<String> message) {
     return Local<Value>(val);
 }
 
-void HandleScope::Escape(JSValue* val) {
+void HandleScope::Escape_(JSValue* val) {
     if (JS_VALUE_HAS_REF_COUNT(*val)) {
-        escapes_.insert(val);
+        if (escapes_.find(val) == escapes_.end()) {
+            escapes_.insert(val);
+        }
+        else {
+            JS_DupValueRT(isolate_->runtime_, *val);
+        }
     }
 }
 
@@ -233,6 +238,12 @@ void HandleScope::Exit() {
         });
         isolate_->value_alloc_pos_ = prev_pos_;
         //std::cout << "---------------- end HandleScope::Exit -------------------" << std::endl;
+    }
+    
+    if (JS_VALUE_HAS_REF_COUNT(scope_value_)) {
+        if (this->escapes_.find(&scope_value_) == this->escapes_.end()) { //not excaped
+            JS_FreeValueRT(isolate_->runtime_, scope_value_);
+        }
     }
 }
 
