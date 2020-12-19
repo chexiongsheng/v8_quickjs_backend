@@ -88,6 +88,12 @@ void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
     }
 }
 
+void FuncDataFinalizer(JSRuntime *rt, JSValue val) {
+    Isolate *isolate = (Isolate *)JS_GetRuntimeOpaque(rt);
+    FunctionTemplate::CFunctionData * cd =  (FunctionTemplate::CFunctionData *)JS_GetOpaque(val, isolate->func_data_class_id_);
+    delete cd;
+}
+
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
     JS_SetRuntimeOpaque(runtime_, this);
@@ -111,6 +117,17 @@ Isolate::Isolate() : current_context_(nullptr) {
     class_id_ = 0;
     JS_NewClassID(&class_id_);
     JS_NewClass(runtime_, class_id_, &cls_def);
+    
+    JSClassDef fd_cls_def;
+    fd_cls_def.class_name = "__function_data";
+    fd_cls_def.finalizer = FuncDataFinalizer;
+    fd_cls_def.exotic = NULL;
+    fd_cls_def.gc_mark = NULL;
+    fd_cls_def.call = NULL;
+    
+    func_data_class_id_ = 0;
+    JS_NewClassID(&func_data_class_id_);
+    JS_NewClass(runtime_, func_data_class_id_, &fd_cls_def);
 };
 
 Isolate::~Isolate() {
@@ -118,7 +135,6 @@ Isolate::~Isolate() {
         delete values_[i];
     }
     values_.clear();
-    function_templates_.clear();
     JS_FreeValueRT(runtime_, literal_values_[kEmptyStringIndex]);
     JS_FreeRuntime(runtime_);
 };
@@ -563,15 +579,6 @@ size_t ArrayBufferView::ByteLength() {
     return byte_length;
 }
 
-int Isolate::RegFunctionTemplate(Local<FunctionTemplate> data) {
-    function_templates_.push_back(data);
-    return function_templates_.size() - 1;
-}
-
-Local<FunctionTemplate>& Isolate::GetFunctionTemplate(int index) {
-    return function_templates_[index];
-}
-
 Local<Object> Context::Global() {
     Object *g = reinterpret_cast<Object*>(&global_);
     return Local<Object>(g);
@@ -664,63 +671,17 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
         std::string name = it.first;
         if (!it.second.getter_.IsEmpty()) {
             flag |= JS_PROP_HAS_GET;
-            JSCFunctionType pfunc;
-            pfunc.getter_magic = [](JSContext *ctx, JSValueConst this_val, int magic) {
-                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
-                Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
-                FunctionCallbackInfo<Value> callbackInfo;
-                callbackInfo.isolate_ = isolate;
-                callbackInfo.argc_ = 0;
-                callbackInfo.argv_ = nullptr;
-                callbackInfo.context_ = ctx;
-                callbackInfo.this_ = this_val;
-                callbackInfo.magic_ = magic;
-                callbackInfo.value_ = JS_Undefined();
-                callbackInfo.isConstructCall = false;
-                
-                functionTemplate->callback_(callbackInfo);
-                
-                if (!JS_IsUndefined(isolate->exception_)) {
-                    JSValue ex = isolate->exception_;
-                    isolate->exception_ = JS_Undefined();
-                    return JS_Throw(ctx, ex);
-                }
-                
-                return callbackInfo.value_;
-            };
-            std::string getter_name = "get " + name;
-            getter = JS_NewCFunction2(context->context_, pfunc.generic, getter_name.c_str(), 0, JS_CFUNC_getter_magic, it.second.getter_->magic_);
+            Local<Function> gfunc = it.second.getter_->GetFunction(context).ToLocalChecked();
+            context->GetIsolate()->Escape(*gfunc);
+            getter = gfunc->value_;
         }
         
         if (!(it.second.attribute_ & ReadOnly) && !it.second.setter_.IsEmpty()) {
-            JSCFunctionType pfunc;
             flag |= JS_PROP_HAS_SET;
             flag |= JS_PROP_WRITABLE;
-            pfunc.setter_magic = [](JSContext *ctx, JSValueConst this_val, JSValueConst val, int magic) {
-                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
-                Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
-                FunctionCallbackInfo<Value> callbackInfo;
-                callbackInfo.isolate_ = isolate;
-                callbackInfo.argc_ = 1;
-                callbackInfo.argv_ = &val;
-                callbackInfo.context_ = ctx;
-                callbackInfo.this_ = this_val;
-                callbackInfo.magic_ = magic;
-                callbackInfo.value_ = JS_Undefined();
-                callbackInfo.isConstructCall = false;
-                
-                functionTemplate->callback_(callbackInfo);
-                
-                if (!JS_IsUndefined(isolate->exception_)) {
-                    JSValue ex = isolate->exception_;
-                    isolate->exception_ = JS_Undefined();
-                    return JS_Throw(ctx, ex);
-                }
-                
-                return callbackInfo.value_;
-            };
-            std::string setter_name = "set " + name;
-            setter = JS_NewCFunction2(context->context_, pfunc.generic, setter_name.c_str(), 0, JS_CFUNC_setter_magic, it.second.setter_->magic_);
+            Local<Function> sfunc = it.second.setter_->GetFunction(context).ToLocalChecked();
+            context->GetIsolate()->Escape(*sfunc);
+            setter = sfunc->value_;
         }
         JSAtom atom = JS_NewAtom(context->context_, name.c_str());
         JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
@@ -738,13 +699,14 @@ void ObjectTemplate::SetInternalFieldCount(int value) {
 Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback callback,
                                               Local<Value> data) {
     Local<FunctionTemplate> functionTemplate(new FunctionTemplate());
-    functionTemplate->callback_ = callback;
     if (data.IsEmpty()) {
-        functionTemplate->data_ = JS_Undefined();
+        functionTemplate->cfunction_data_.data_ = JS_Undefined();
     } else {
-        functionTemplate->data_ = data->value_;
+        functionTemplate->cfunction_data_.data_ = data->value_;
     }
-    functionTemplate->magic_ = isolate->RegFunctionTemplate(functionTemplate);
+    functionTemplate->cfunction_data_.callback_ = callback;
+    
+    //isolate->RegFunctionTemplate(functionTemplate);
     functionTemplate->isolate_ = isolate;
     return functionTemplate;
 }
@@ -775,32 +737,37 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         JS_DupValueRT(isolate_->runtime_, ret->value_);
         return MaybeLocal<Function>(Local<Function>(ret));
     }
-    is_construtor_ = !prototype_template_.IsEmpty() || !instance_template_.IsEmpty() || fields_.size() > 0 || accessor_property_infos_.size() > 0 || !parent_.IsEmpty();
-    JSValue func = JS_NewCFunctionMagic(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic) {
+    cfunction_data_.is_construtor_ = !prototype_template_.IsEmpty() || !instance_template_.IsEmpty() || fields_.size() > 0 || accessor_property_infos_.size() > 0 || !parent_.IsEmpty();
+    cfunction_data_.internal_field_count_ = instance_template_.IsEmpty() ? 0 : instance_template_->internal_field_count_;
+    JSValue func_data = JS_NewObjectClass(context->context_, context->GetIsolate()->func_data_class_id_);
+    CFunctionData *cd = new CFunctionData();
+    *cd = cfunction_data_;
+    JS_SetOpaque(func_data, cd);
+    JSValue func = JS_NewCFunctionData(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *func_data) {
         Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
-        Local<FunctionTemplate> functionTemplate = isolate->GetFunctionTemplate(magic);
+        CFunctionData *cfunction_data = (CFunctionData *)JS_GetOpaque3(*func_data);
         FunctionCallbackInfo<Value> callbackInfo;
         callbackInfo.isolate_ = isolate;
         callbackInfo.argc_ = argc;
         callbackInfo.argv_ = argv;
         callbackInfo.context_ = ctx;
         callbackInfo.this_ = this_val;
-        callbackInfo.magic_ = magic;
+        callbackInfo.data_ = cfunction_data->data_;
         callbackInfo.value_ = JS_Undefined();
-        callbackInfo.isConstructCall = functionTemplate->is_construtor_;
+        callbackInfo.isConstructCall = cfunction_data->is_construtor_;
         
-        if (callbackInfo.isConstructCall && functionTemplate->instance_template_->internal_field_count_ > 0) {
+        if (callbackInfo.isConstructCall && cfunction_data->internal_field_count_ > 0) {
             JSValue proto = JS_GetProperty(ctx, this_val, JS_ATOM_prototype);
             callbackInfo.this_ = JS_NewObjectProtoClass(ctx, proto, isolate->class_id_);
             JS_FreeValue(ctx, proto);
-            size_t size = sizeof(ObjectUserData) + sizeof(void*) * (functionTemplate->InstanceTemplate()->internal_field_count_ - 1);
+            size_t size = sizeof(ObjectUserData) + sizeof(void*) * (cfunction_data->internal_field_count_ - 1);
             ObjectUserData* object_udata = (ObjectUserData*)js_malloc(ctx, size);
             memset(object_udata, 0, size);
-            object_udata->len_ = functionTemplate->instance_template_->internal_field_count_;
+            object_udata->len_ = cfunction_data->internal_field_count_;
             JS_SetOpaque(callbackInfo.this_, object_udata);
         }
         
-        functionTemplate->callback_(callbackInfo);
+        cfunction_data->callback_(callbackInfo);
         
         if (!JS_IsUndefined(isolate->exception_)) {
             JSValue ex = isolate->exception_;
@@ -809,9 +776,11 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         }
         
         return callbackInfo.isConstructCall ? callbackInfo.this_ : callbackInfo.value_;
-    }, "native", 0, is_construtor_ ? JS_CFUNC_constructor_magic : JS_CFUNC_generic_magic, magic_); //TODO: native可以替换成成员函数名
+    }, 0, 0, 1, &func_data); //TODO: native可以替换成成员函数名
+    JS_FreeValue(context->context_, func_data);
     
-    if (is_construtor_) {
+    if (cfunction_data_.is_construtor_) {
+        JS_SetConstructorBit(context->context_, func, 1);
         JSValue proto = JS_NewObject(context->context_);
         if (!prototype_template_.IsEmpty()) prototype_template_->InitPropertys(context, proto);
         InitPropertys(context, func);
@@ -846,6 +815,7 @@ FunctionTemplate::~FunctionTemplate() {
 Maybe<bool> Object::Set(Local<Context> context,
                         Local<Value> key, Local<Value> value) {
     bool ok = false;
+    context->GetIsolate()->Escape(*value);
     if (key->IsNumber()) {
         ok = JS_SetPropertyUint32(context->context_, value_, key->Uint32Value(context).ToChecked(), value->value_);
     } else {
@@ -853,8 +823,6 @@ Maybe<bool> Object::Set(Local<Context> context,
         ok = JS_SetProperty(context->context_, value_, atom, value->value_);
         JS_FreeAtom(context->context_, atom);
     }
-    
-    context->GetIsolate()->Escape(*value);
     
     return Maybe<bool>(ok);
 }

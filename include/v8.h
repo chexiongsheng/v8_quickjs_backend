@@ -688,18 +688,14 @@ public:
     void SetPromiseRejectCallback(PromiseRejectCallback callback);
     
     void handleException();
-    
-    int RegFunctionTemplate(Local<FunctionTemplate> data);
-    
-    Local<FunctionTemplate>& GetFunctionTemplate(int index);
 
     JSRuntime *runtime_;
     
     JSClassID class_id_;
+    
+    JSClassID func_data_class_id_;
 
     Local<Context> current_context_;
-    
-    std::vector<Local<FunctionTemplate>> function_templates_;
 
     Isolate();
 
@@ -1155,6 +1151,13 @@ typedef void (*FunctionCallback)(const FunctionCallbackInfo<Value>& info);
 
 class V8_EXPORT FunctionTemplate : public Template {
 public:
+    struct CFunctionData {
+        JSValue data_;
+        FunctionCallback callback_;
+        int internal_field_count_;
+        bool is_construtor_;
+    };
+    
     static Local<FunctionTemplate> New(
         Isolate* isolate, FunctionCallback callback = nullptr,
         Local<Value> data = Local<Value>());
@@ -1171,11 +1174,8 @@ public:
     V8_INLINE static FunctionTemplate* Cast(v8::Data* obj) {
         return dynamic_cast<FunctionTemplate*>(obj);
     }
-
-    int magic_;
-    FunctionCallback callback_;
-    JSValue data_;
-    bool is_construtor_ = false;
+    
+    CFunctionData cfunction_data_;
     
     Isolate* isolate_;
     
@@ -1250,7 +1250,7 @@ public:
     }
     
     V8_INLINE Local<Value> Data() const {
-        Value* ret = reinterpret_cast<Value*>(&(isolate_->GetFunctionTemplate(magic_)->data_));
+        Value* ret = reinterpret_cast<Value*>(const_cast<JSValue*>(&data_));
         return Local<Value>(ret);
     }
     
@@ -1268,7 +1268,7 @@ public:
     JSContext* context_;
     JSValueConst this_;
     Isolate * isolate_;
-    int magic_;
+    JSValue data_;
     bool isConstructCall;
 };
 
