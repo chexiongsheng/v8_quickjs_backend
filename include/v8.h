@@ -695,8 +695,6 @@ public:
     JSRuntime *runtime_;
     
     JSClassID class_id_;
-    
-    JSClassID func_data_class_id_;
 
     Local<Context> current_context_;
 

@@ -88,12 +88,6 @@ void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
     }
 }
 
-void FuncDataFinalizer(JSRuntime *rt, JSValue val) {
-    Isolate *isolate = (Isolate *)JS_GetRuntimeOpaque(rt);
-    FunctionTemplate::CFunctionData * cd =  (FunctionTemplate::CFunctionData *)JS_GetOpaque(val, isolate->func_data_class_id_);
-    delete cd;
-}
-
 Isolate::Isolate() : current_context_(nullptr) {
     runtime_ = JS_NewRuntime();
     JS_SetRuntimeOpaque(runtime_, this);
@@ -117,17 +111,6 @@ Isolate::Isolate() : current_context_(nullptr) {
     class_id_ = 0;
     JS_NewClassID(&class_id_);
     JS_NewClass(runtime_, class_id_, &cls_def);
-    
-    JSClassDef fd_cls_def;
-    fd_cls_def.class_name = "__function_data";
-    fd_cls_def.finalizer = FuncDataFinalizer;
-    fd_cls_def.exotic = NULL;
-    fd_cls_def.gc_mark = NULL;
-    fd_cls_def.call = NULL;
-    
-    func_data_class_id_ = 0;
-    JS_NewClassID(&func_data_class_id_);
-    JS_NewClass(runtime_, func_data_class_id_, &fd_cls_def);
 };
 
 Isolate::~Isolate() {
@@ -828,35 +811,41 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     }
     cfunction_data_.is_construtor_ = !prototype_template_.IsEmpty() || !instance_template_.IsEmpty() || fields_.size() > 0 || accessor_property_infos_.size() > 0 || !parent_.IsEmpty();
     cfunction_data_.internal_field_count_ = instance_template_.IsEmpty() ? 0 : instance_template_->internal_field_count_;
-    JSValue func_data = JS_NewObjectClass(context->context_, context->GetIsolate()->func_data_class_id_);
-    CFunctionData *cd = new CFunctionData();
-    *cd = cfunction_data_;
-    JS_SetOpaque(func_data, cd);
+    
+    JSValue func_data[4];
+    JS_INITPTR(func_data[0], JS_TAG_EXTERNAL, (void*)cfunction_data_.callback_);
+    func_data[1] = JS_NewInt32_(context->context_, cfunction_data_.internal_field_count_);
+    func_data[2] = cfunction_data_.data_;
+    func_data[3] = cfunction_data_.is_construtor_ ? JS_True() : JS_False();
+    
     JSValue func = JS_NewCFunctionData(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *func_data) {
         Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
-        CFunctionData *cfunction_data = (CFunctionData *)JS_GetOpaque(*func_data, isolate->func_data_class_id_);
+        FunctionCallback callback = (FunctionCallback)(JS_VALUE_GET_PTR(func_data[0]));
+        int32_t internal_field_count;
+        JS_ToInt32(ctx, &internal_field_count, func_data[1]);
         FunctionCallbackInfo<Value> callbackInfo;
         callbackInfo.isolate_ = isolate;
         callbackInfo.argc_ = argc;
         callbackInfo.argv_ = argv;
         callbackInfo.context_ = ctx;
         callbackInfo.this_ = this_val;
-        callbackInfo.data_ = cfunction_data->data_;
+        callbackInfo.data_ = func_data[2];
         callbackInfo.value_ = JS_Undefined();
-        callbackInfo.isConstructCall = cfunction_data->is_construtor_;
+        //JS_IsConstructor(ctx, this_val)，静态方法的话，用JS_IsConstructor会返回true，其父节点对象是构造函数，这个就是构造函数？
+        callbackInfo.isConstructCall = JS_ToBool(ctx, func_data[3]);
         
-        if (callbackInfo.isConstructCall && cfunction_data->internal_field_count_ > 0) {
+        if (callbackInfo.isConstructCall && internal_field_count > 0) {
             JSValue proto = JS_GetProperty(ctx, this_val, JS_ATOM_prototype);
             callbackInfo.this_ = JS_NewObjectProtoClass(ctx, proto, isolate->class_id_);
             JS_FreeValue(ctx, proto);
-            size_t size = sizeof(ObjectUserData) + sizeof(void*) * (cfunction_data->internal_field_count_ - 1);
+            size_t size = sizeof(ObjectUserData) + sizeof(void*) * (internal_field_count - 1);
             ObjectUserData* object_udata = (ObjectUserData*)js_malloc(ctx, size);
             memset(object_udata, 0, size);
-            object_udata->len_ = cfunction_data->internal_field_count_;
+            object_udata->len_ = internal_field_count;
             JS_SetOpaque(callbackInfo.this_, object_udata);
         }
         
-        cfunction_data->callback_(callbackInfo);
+        callback(callbackInfo);
         
         if (!JS_IsUndefined(isolate->exception_)) {
             JSValue ex = isolate->exception_;
@@ -865,8 +854,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         }
         
         return callbackInfo.isConstructCall ? callbackInfo.this_ : callbackInfo.value_;
-    }, 0, 0, 1, &func_data); //TODO: native可以替换成成员函数名
-    JS_FreeValue(context->context_, func_data);
+    }, 0, 0, 4, &func_data[0]);
     
     if (cfunction_data_.is_construtor_) {
         JS_SetConstructorBit(context->context_, func, 1);
