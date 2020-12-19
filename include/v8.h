@@ -106,6 +106,8 @@ void DecRef_(Isolate * isolate, JSValue val);
 
 void SetGlobal_(Isolate * isolate, Value * des, Value* src);
 
+void * GetUserData_(Isolate * isolate, JSValue val);
+
 template <class T>
 class Local {
 public:
@@ -180,8 +182,8 @@ public:
         IncRef_(isolate, val_->value_);
     }
     
-    V8_INLINE void * GetUserData() {
-        return JS_GetOpaque3(val_->value_);
+    V8_INLINE void * GetUserData(Isolate * isolate) {
+        return GetUserData_(isolate, val_->value_);
     }
     
     V8_INLINE void DecRef(Isolate * isolate) {
@@ -241,7 +243,7 @@ public:
     
     V8_INLINE void IncRef(Isolate * isolate) { }
     
-    V8_INLINE void * GetUserData() { return nullptr; }
+    V8_INLINE void * GetUserData(Isolate * isolate) { return nullptr; }
     
     V8_INLINE void DecRef(Isolate * isolate) { }
     
@@ -838,6 +840,10 @@ V8_INLINE void SetGlobal_(Isolate * isolate, Value * des, Value* src) {
     des->value_ = src ->value_;
 }
 
+V8_INLINE void * GetUserData_(Isolate * isolate, JSValue val) {
+    return JS_GetOpaque(val, isolate->class_id_);
+}
+
 template <typename T>
 class WeakCallbackInfo {
 public:
@@ -865,7 +871,7 @@ public:
                            WeakCallbackType type) {
         if (!weak_ && val_.SupportWeak()) {
             weak_ = true;
-            ObjectUserData* object_udata = reinterpret_cast<ObjectUserData*>(val_.GetUserData());
+            ObjectUserData* object_udata = reinterpret_cast<ObjectUserData*>(val_.GetUserData(isolate_));
             if (object_udata) {
                 object_udata->callback_ = reinterpret_cast<WeakCallback>(callback);
                 object_udata->parameter_ = parameter;

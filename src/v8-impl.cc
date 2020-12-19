@@ -745,7 +745,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     JS_SetOpaque(func_data, cd);
     JSValue func = JS_NewCFunctionData(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *func_data) {
         Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
-        CFunctionData *cfunction_data = (CFunctionData *)JS_GetOpaque3(*func_data);
+        CFunctionData *cfunction_data = (CFunctionData *)JS_GetOpaque(*func_data, isolate->func_data_class_id_);
         FunctionCallbackInfo<Value> callbackInfo;
         callbackInfo.isolate_ = isolate;
         callbackInfo.argc_ = argc;
@@ -843,7 +843,7 @@ MaybeLocal<Value> Object::Get(Local<Context> context,
 }
 
 void Object::SetAlignedPointerInInternalField(int index, void* value) {
-    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(value_));
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque(value_, Isolate::current_->class_id_));
     //if (index == 0) std::cout << "SetAlignedPointerInInternalField, value:" << value << ", objptr:" << JS_VALUE_GET_PTR(value_) << std::endl;
     if (!objectUdata || index >= objectUdata->len_) {
         std::cerr << "SetAlignedPointerInInternalField";
@@ -860,7 +860,7 @@ void Object::SetAlignedPointerInInternalField(int index, void* value) {
 }
     
 void* Object::GetAlignedPointerFromInternalField(int index) {
-    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(value_));
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque(value_, Isolate::current_->class_id_));
     
     bool noObjectUdata = IsFunction() || objectUdata == nullptr;
 
@@ -879,7 +879,7 @@ void* Object::GetAlignedPointerFromInternalField(int index) {
 }
 
 int Object::InternalFieldCount() {
-    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(value_));
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque(value_, Isolate::current_->class_id_));
     
     bool noObjectUdata = IsFunction() || objectUdata == nullptr;
 

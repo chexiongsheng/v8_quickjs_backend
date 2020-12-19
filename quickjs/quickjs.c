@@ -53800,15 +53800,6 @@ void JS_AddIntrinsicTypedArrays(JSContext *ctx)
 }
 
 /*-------begin fuctions for v8 api---------*/
-void *JS_GetOpaque3(JSValueConst obj)
-{
-    JSObject *p;
-    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
-        return NULL;
-    p = JS_VALUE_GET_OBJ(obj);
-    return p->u.opaque;
-}
-
 JS_BOOL JS_IsArrayBuffer(JSValueConst obj)
 {
     JSObject *p;

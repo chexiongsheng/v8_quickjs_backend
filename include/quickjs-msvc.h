@@ -983,7 +983,6 @@ JSValue JS_True();
 JSValue JS_False();
 JSValue JS_Null();
 JSValue JS_Undefined();
-void *JS_GetOpaque3(JSValueConst obj);
 JS_BOOL JS_IsArrayBuffer(JSValueConst obj);
 JS_BOOL JS_IsArrayBufferView(JSValueConst obj);
 JSValue JS_GetArrayBufferView(JSContext *ctx, JSValueConst obj);
