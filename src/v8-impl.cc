@@ -78,7 +78,7 @@ Isolate* Promise::GetIsolate() {
 void V8FinalizerWrap(JSRuntime *rt, JSValue val) {
     Isolate* isolate = (Isolate*)JS_GetRuntimeOpaque(rt);
     v8::Isolate::Scope Isolatescope(isolate);
-    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque3(val));
+    ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque(val, isolate->class_id_));
     if (objectUdata) {
         if (objectUdata->callback_) {
             objectUdata->callback_(objectUdata);
