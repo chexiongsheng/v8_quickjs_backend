@@ -46,6 +46,7 @@ class HandleScope;
 class BigInt;
 template <class T> class PersistentBase;
 class Number;
+template <class T> class PropertyCallbackInfo;
 
 class V8_EXPORT StartupData {
 public:
@@ -1146,11 +1147,41 @@ public:
     void InitPropertys(Local<Context> context, JSValue obj);
 };
 
+enum AccessControl {
+  DEFAULT               = 0,
+  ALL_CAN_READ          = 1,
+  ALL_CAN_WRITE         = 1 << 1,
+  PROHIBITS_OVERWRITING = 1 << 2
+};
+
+typedef void (*AccessorNameGetterCallback)(Local<Name> property, const PropertyCallbackInfo<Value>& info);
+
+
+typedef void (*AccessorNameSetterCallback)(Local<Name> property, Local<Value> value,
+                                           const PropertyCallbackInfo<void>& info);
+
 class V8_EXPORT ObjectTemplate : public Template {
 public:
     void SetInternalFieldCount(int value);
     
     int internal_field_count_ = 0;
+    
+    void SetAccessor(Local<Name> name, AccessorNameGetterCallback getter,
+                     AccessorNameSetterCallback setter = nullptr,
+                     Local<Value> data = Local<Value>(), AccessControl settings = DEFAULT,
+                     PropertyAttribute attribute = None);
+    
+    void InitAccessors(Local<Context> context, JSValue obj);
+    
+    struct AccessorInfo {
+        AccessorNameGetterCallback getter_;
+        AccessorNameSetterCallback setter_;
+        JSValue data_;
+        AccessControl settings_;
+        PropertyAttribute attribute_;
+    };
+    
+    std::map<std::string, AccessorInfo> accessor_infos_;
 };
 
 typedef void (*FunctionCallback)(const FunctionCallbackInfo<Value>& info);
@@ -1276,6 +1307,39 @@ public:
     Isolate * isolate_;
     JSValue data_;
     bool isConstructCall;
+};
+
+template<typename T>
+class PropertyCallbackInfo {
+public:
+    V8_INLINE Isolate* GetIsolate() const {
+        return isolate_;
+    }
+    
+    V8_INLINE Local<Value> Data() const {
+        Value* ret = reinterpret_cast<Value*>(const_cast<JSValue*>(&data_));
+        return Local<Value>(ret);
+    }
+    
+    V8_INLINE Local<Object> This() const {
+        Object* obj = reinterpret_cast<Object*>(const_cast<JSValue*>(&this_));
+        return Local<Object>(obj);
+    }
+    
+    //quickjs没有类似的机制S
+    V8_INLINE Local<Object> Holder() const {
+        return This();
+    }
+    
+    V8_INLINE ReturnValue<T> GetReturnValue() const {
+        return ReturnValue<T>(isolate_, context_, const_cast<JSValue*>(&value_));
+    }
+    
+    Isolate * isolate_;
+    JSContext* context_;
+    JSValue data_;
+    JSValue value_;
+    JSValueConst this_;
 };
 
 class ScriptOrigin {

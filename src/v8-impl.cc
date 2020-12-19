@@ -691,6 +691,95 @@ void Template::InitPropertys(Local<Context> context, JSValue obj) {
     }
 }
 
+void ObjectTemplate::SetAccessor(Local<Name> name, AccessorNameGetterCallback getter,
+                                 AccessorNameSetterCallback setter,
+                                 Local<Value> data, AccessControl settings,
+                                 PropertyAttribute attribute) {
+    JSValue js_data = data.IsEmpty() ? JS_Undefined() : data->value_;
+    accessor_infos_[*String::Utf8Value(Isolate::current_, name)] = {getter, setter, js_data, settings, attribute};
+}
+
+void ObjectTemplate::InitAccessors(Local<Context> context, JSValue obj) {
+    for (auto it : accessor_infos_) {
+        JSValue getter = JS_Undefined();
+        JSValue setter = JS_Undefined();
+        int flag = 0;
+        if (!(it.second.attribute_ & DontDelete)) {
+            flag |= JS_PROP_CONFIGURABLE;
+        }
+        if (!(it.second.attribute_ & DontEnum)) {
+            flag |= JS_PROP_ENUMERABLE;
+        }
+        
+        std::string name = it.first;
+        
+        auto name_val = String::NewFromUtf8(context->GetIsolate(), name.c_str()).ToLocalChecked();
+        
+        JSValue func_data[] = {JS_Undefined(), name_val->value_, it.second.data_};
+        
+        if (it.second.getter_) {
+            flag |= JS_PROP_HAS_GET;
+            JS_INITPTR(func_data[0], JS_TAG_EXTERNAL, (void*)it.second.getter_);
+            getter = JS_NewCFunctionData(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *func_data) {
+                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
+                
+                PropertyCallbackInfo<Value> callbackInfo;
+                callbackInfo.isolate_ = isolate;
+                callbackInfo.context_ = ctx;
+                callbackInfo.this_ = this_val;
+                callbackInfo.data_ = func_data[2];
+                callbackInfo.value_ = JS_Undefined();
+                
+                String *key = reinterpret_cast<String*>(&func_data[1]);
+                AccessorNameGetterCallback callback = (AccessorNameGetterCallback)(JS_VALUE_GET_PTR(func_data[0]));
+                callback(Local<String>(key), callbackInfo);
+                
+                if (!JS_IsUndefined(isolate->exception_)) {
+                    JSValue ex = isolate->exception_;
+                    isolate->exception_ = JS_Undefined();
+                    return JS_Throw(ctx, ex);
+                }
+                
+                return callbackInfo.value_;
+            }, 0, 0, 3, &func_data[0]);
+        }
+        
+        if (!(it.second.attribute_ & ReadOnly) && it.second.setter_) {
+            flag |= JS_PROP_HAS_SET;
+            flag |= JS_PROP_WRITABLE;
+            JS_INITPTR(func_data[0], JS_TAG_EXTERNAL, (void*)it.second.setter_);
+            setter = JS_NewCFunctionData(context->context_, [](JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv, int magic, JSValue *func_data) {
+                Isolate* isolate = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx))->GetIsolate();
+                
+                PropertyCallbackInfo<void> callbackInfo;
+                callbackInfo.isolate_ = isolate;
+                callbackInfo.context_ = ctx;
+                callbackInfo.this_ = this_val;
+                callbackInfo.data_ = func_data[2];
+                callbackInfo.value_ = JS_Undefined();
+                
+                String *key = reinterpret_cast<String*>(&func_data[1]);
+                Value *val = reinterpret_cast<Value*>(argv);
+                AccessorNameSetterCallback callback = (AccessorNameSetterCallback)(JS_VALUE_GET_PTR(func_data[0]));
+                callback(Local<String>(key), Local<Value>(val), callbackInfo);
+                
+                if (!JS_IsUndefined(isolate->exception_)) {
+                    JSValue ex = isolate->exception_;
+                    isolate->exception_ = JS_Undefined();
+                    return JS_Throw(ctx, ex);
+                }
+                
+                return callbackInfo.value_;
+            }, 0, 0, 3, &func_data[0]);
+        }
+        JSAtom atom = JS_NewAtom(context->context_, name.c_str());
+        JS_DefineProperty(context->context_, obj, atom, JS_Undefined(), getter, setter, flag);
+        JS_FreeAtom(context->context_, atom);
+        JS_FreeValue(context->context_, getter);
+        JS_FreeValue(context->context_, setter);
+    }
+}
+
 void ObjectTemplate::SetInternalFieldCount(int value) {
     internal_field_count_ = value;
 }
@@ -782,7 +871,10 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     if (cfunction_data_.is_construtor_) {
         JS_SetConstructorBit(context->context_, func, 1);
         JSValue proto = JS_NewObject(context->context_);
-        if (!prototype_template_.IsEmpty()) prototype_template_->InitPropertys(context, proto);
+        if (!prototype_template_.IsEmpty()) {
+            prototype_template_->InitPropertys(context, proto);
+            prototype_template_->InitAccessors(context, proto);
+        }
         InitPropertys(context, func);
         JS_SetConstructor(context->context_, func, proto);
         JS_FreeValue(context->context_, proto);

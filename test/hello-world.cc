@@ -130,12 +130,30 @@ static void MapCount(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set((int)map->size());
 }
 
+static void MapCount2(v8::Local<v8::Name> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
+    
+    const char* msg = reinterpret_cast<const char*>((v8::Local<v8::External>::Cast(info.Data()))->Value());
+    std::cout << "MapCount2, msg:" << msg << std::endl;
+    info.GetReturnValue().Set((int)map->size());
+}
+
 static void MapCountSet(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     std::map<std::string, std::string>* map = static_cast<std::map<std::string, std::string>*>(info.Holder()->GetAlignedPointerFromInternalField(0));
     
     std::cout << "ignore set count, " << info[0]->Int32Value(context).ToChecked() << std::endl;
+}
+
+static void MapCountSet2(v8::Local<v8::Name> property,v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info) {
+    v8::Isolate* isolate = info.GetIsolate();
+    v8::Local<v8::Context> context = isolate->GetCurrentContext();
+    
+    const char* msg = reinterpret_cast<const char*>((v8::Local<v8::External>::Cast(info.Data()))->Value());
+    std::cout << "MapCountSet2, msg:" << msg << ", val:" << value->Int32Value(context).ToChecked() << std::endl;
 }
 
 static void MapStatic(const v8::FunctionCallbackInfo<v8::Value>& info) {
@@ -259,6 +277,7 @@ int main(int argc, char* argv[]) {
         tpl->PrototypeTemplate()->Set(isolate, "set", v8::FunctionTemplate::New(isolate, MapSet));
         tpl->PrototypeTemplate()->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "count").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapCount),
                                                       v8::FunctionTemplate::New(isolate, MapCountSet));
+        tpl->PrototypeTemplate()->SetAccessor(v8::String::NewFromUtf8(isolate, "count2").ToLocalChecked(), MapCount2, MapCountSet2, external);
         tpl->Set(isolate, "static", v8::FunctionTemplate::New(isolate, MapStatic));
         tpl->SetAccessorProperty(v8::String::NewFromUtf8(isolate, "sprop").ToLocalChecked(), v8::FunctionTemplate::New(isolate, MapStaticPropGet),
                                  v8::FunctionTemplate::New(isolate, MapStaticPropSet));
@@ -355,6 +374,9 @@ int main(int argc, char* argv[]) {
                 print(m.get('def'));
                 print(m.get('fff'));
                 m.count = 1000;
+            
+                print(m.count2);
+                m.count2 = 1001;
             
                 m.basemethod();
             
