@@ -47,6 +47,8 @@ class BigInt;
 template <class T> class PersistentBase;
 class Number;
 template <class T> class PropertyCallbackInfo;
+class Integer;
+class Int32;
 
 class V8_EXPORT StartupData {
 public:
@@ -249,6 +251,10 @@ public:
     V8_INLINE void DecRef(Isolate * isolate) { }
     
     V8_INLINE void SetGlobal(Isolate * isolate, Value *val) { }
+    
+    V8_INLINE static Local<T> New(Isolate* isolate, const PersistentBase<T>& that) {
+        return that.Get(isolate);
+    }
 };
 
 template <>
@@ -504,6 +510,13 @@ public:
     
     V8_WARN_UNUSED_RESULT MaybeLocal<Number> ToNumber(
         Local<Context> context) const;
+    
+    Local<Boolean> ToBoolean(Isolate* isolate) const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Int32> ToInt32(Local<Context> context) const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Integer> ToInteger(
+         Local<Context> context) const;
     
     bool BooleanValue(Isolate* isolate) const;
     
@@ -1004,6 +1017,15 @@ public:
     
     V8_INLINE static Integer* Cast(v8::Value* obj) {
         return static_cast<Integer*>(obj);
+    }
+};
+
+class V8_EXPORT Int32 : public Integer {
+public:
+    int32_t Value() const;
+    
+    V8_INLINE static Int32* Cast(v8::Value* obj) {
+        return static_cast<Int32*>(obj);
     }
 };
 

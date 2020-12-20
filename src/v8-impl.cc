@@ -309,6 +309,18 @@ MaybeLocal<Number> Value::ToNumber(Local<Context> context) const {
     }
 }
 
+Local<Boolean> Value::ToBoolean(Isolate* isolate) const {
+    return Local<Boolean>(static_cast<Boolean*>(const_cast<Value*>(this)));
+}
+
+MaybeLocal<Int32> Value::ToInt32(Local<Context> context) const {
+    return MaybeLocal<Int32>(Local<Int32>(static_cast<Int32*>(const_cast<Value*>(this))));
+}
+
+MaybeLocal<Integer> Value::ToInteger(Local<Context> context) const {
+    return MaybeLocal<Integer>(Local<Integer>(static_cast<Integer*>(const_cast<Value*>(this))));
+}
+
 bool Value::BooleanValue(Isolate* isolate) const {
     return JS_ToBool(isolate->current_context_->context_, value_);
 }
@@ -490,7 +502,21 @@ int64_t Integer::Value() const {
     } else if (JS_VALUE_GET_TAG(value_) == JS_TAG_FLOAT64) {
         return (int64_t)JS_VALUE_GET_FLOAT64(value_);
     } else {
-        return 0;
+        int64_t i;
+        JS_ToInt64(Isolate::current_->GetCurrentContext()->context_, &i, value_);
+        return i;
+    }
+}
+
+int32_t Int32::Value() const {
+    if (JS_VALUE_GET_TAG(value_) == JS_TAG_INT) {
+        return JS_VALUE_GET_INT(value_);
+    } else if (JS_VALUE_GET_TAG(value_) == JS_TAG_FLOAT64) {
+        return (int32_t)JS_VALUE_GET_FLOAT64(value_);
+    } else {
+        int32_t i;
+        JS_ToInt32(Isolate::current_->GetCurrentContext()->context_, &i, value_);
+        return i;
     }
 }
 
