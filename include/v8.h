@@ -23,6 +23,11 @@
 
 #define JS_TAG_EXTERNAL (JS_TAG_FLOAT64 + 1)
 
+#define V8_MAJOR_VERSION 8
+#define V8_MINOR_VERSION 4
+#define V8_BUILD_NUMBER 371
+#define V8_PATCH_LEVEL 19
+
 namespace v8 {
 class Object;
 class Isolate;
@@ -452,6 +457,9 @@ public:
 private:
     Local<T> val_;
 };
+
+template <class T>
+using Handle = Local<T>;
 
 class V8_EXPORT Data {
 public:
@@ -1229,7 +1237,7 @@ public:
     Local<ObjectTemplate> PrototypeTemplate();
     
     V8_INLINE static FunctionTemplate* Cast(v8::Data* obj) {
-        return dynamic_cast<FunctionTemplate*>(obj);
+        return static_cast<FunctionTemplate*>(obj);
     }
     
     CFunctionData cfunction_data_;
