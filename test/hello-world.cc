@@ -217,6 +217,11 @@ static void TestScope(const v8::FunctionCallbackInfo<v8::Value>& info) {
     info.GetReturnValue().Set(NewStringScope(info.GetIsolate()));
 }
 
+//static v8::Local<v8::FunctionTemplate> GenTemplate(v8::Isolate* isolate) {
+//    v8::EscapableHandleScope handle_scope(isolate);
+//    return handle_scope.Escape(v8::FunctionTemplate::New(isolate));
+//}
+
 int main(int argc, char* argv[]) {
     // Initialize V8.
     v8::StartupData SnapshotBlob;

@@ -54,6 +54,7 @@ class Number;
 template <class T> class PropertyCallbackInfo;
 class Integer;
 class Int32;
+class EscapableHandleScope;
 
 class V8_EXPORT StartupData {
 public:
@@ -115,6 +116,8 @@ void DecRef_(Isolate * isolate, JSValue val);
 void SetGlobal_(Isolate * isolate, Value * des, Value* src);
 
 void * GetUserData_(Isolate * isolate, JSValue val);
+
+Value *EscapeValue_(Value* val, EscapableHandleScope* scope);
 
 template <class T>
 class Local {
@@ -201,6 +204,11 @@ public:
     V8_INLINE void SetGlobal(Isolate * isolate, Value *val) {
         SetGlobal_(isolate, val, val_);
         val_ = static_cast<T*>(val);
+    }
+    
+    V8_INLINE Local<T> Escape(EscapableHandleScope* scope) {
+        T* val = static_cast<T*>(EscapeValue_(val_, scope));
+        return Local<T>(val);
     }
     
     V8_INLINE static Local<T> New(Isolate* isolate, const PersistentBase<T>& that) {
@@ -329,6 +337,10 @@ public:
     explicit V8_INLINE Local(FunctionTemplate* that) : LocalSharedPtrImpl(that) { }
     
     V8_INLINE Local<FunctionTemplate> Clone(Isolate * isolate) const {
+        return *this;
+    }
+    
+    V8_INLINE Local<FunctionTemplate> Escape(EscapableHandleScope* scope) {
         return *this;
     }
 };
@@ -1428,12 +1440,15 @@ public:
     template <class T>
     V8_INLINE Local<T> Escape(Local<T> value) {
         V8::Check(prev_scope_ != nullptr, "no prev scope to escape");
-        T* pval = *value;
-        Escape_(reinterpret_cast<JSValue*>(pval));
-        prev_scope_->scope_value_ = pval->value_;
-        return Local<T>(reinterpret_cast<T*>(&prev_scope_->scope_value_));
+        return value.Escape(this);
     }
 };
+
+V8_INLINE Value *EscapeValue_(Value* val, EscapableHandleScope* scope) {
+    scope->Escape_(reinterpret_cast<JSValue*>(val));
+    scope->prev_scope_->scope_value_ = val->value_;
+    return reinterpret_cast<Value*>(&scope->prev_scope_->scope_value_);
+}
 
 class V8_EXPORT Script : Data {
 public:
