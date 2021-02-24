@@ -578,6 +578,8 @@ public:
     
     int InternalFieldCount();
     
+    static Local<Object> New(Isolate* isolate);
+    
     V8_INLINE static Object* Cast(Value* obj) {
         return static_cast<Object*>(obj);
     }
@@ -1165,6 +1167,10 @@ public:
     }
     
     V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context, int argc, Local<Value> argv[]) const;
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Object> NewInstance(Local<Context> context) const {
+        return NewInstance(context, 0, nullptr);
+    }
 };
 
 enum PropertyAttribute {

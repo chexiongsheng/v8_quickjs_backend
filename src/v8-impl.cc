@@ -1025,6 +1025,12 @@ int Object::InternalFieldCount() {
     return objectUdata->len_;
 }
 
+Local<Object> Object::New(Isolate* isolate) {
+    Object *object = isolate->Alloc<Object>();
+    object->value_ = JS_NewObject(isolate->GetCurrentContext()->context_);
+    return Local<Object>(object);
+}
+
 uint32_t Array::Length() const {
     auto context = Isolate::current_->GetCurrentContext()->context_;
     auto len = JS_GetProperty(context, value_, JS_ATOM_length);
