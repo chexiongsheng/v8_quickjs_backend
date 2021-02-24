@@ -55,6 +55,7 @@ template <class T> class PropertyCallbackInfo;
 class Integer;
 class Int32;
 class EscapableHandleScope;
+class Array;
 
 class V8_EXPORT StartupData {
 public:
@@ -560,8 +561,16 @@ public:
     V8_WARN_UNUSED_RESULT Maybe<bool> Set(Local<Context> context,
         Local<Value> key, Local<Value> value);
     
+    V8_WARN_UNUSED_RESULT Maybe<bool> Set(Local<Context> context,
+        uint32_t index, Local<Value> value);
+    
     V8_WARN_UNUSED_RESULT MaybeLocal<Value> Get(Local<Context> context,
         Local<Value> key);
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> Get(Local<Context> context,
+        uint32_t index);
+    
+    V8_WARN_UNUSED_RESULT MaybeLocal<Array> GetOwnPropertyNames(Local<Context> context);
     
     void SetAlignedPointerInInternalField(int index, void* value);
     
@@ -571,6 +580,15 @@ public:
     
     V8_INLINE static Object* Cast(Value* obj) {
         return static_cast<Object*>(obj);
+    }
+};
+
+class V8_EXPORT Array : public Object {
+public:
+    uint32_t Length() const;
+
+    V8_INLINE static Array* Cast(Value* obj) {
+        return static_cast<Array*>(obj);
     }
 };
 

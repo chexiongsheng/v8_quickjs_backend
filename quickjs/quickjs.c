@@ -53921,4 +53921,9 @@ JS_BOOL JS_IsRegExp(JSValueConst obj)
     return p->class_id == JS_CLASS_REGEXP;
 }
 
+JSValue JS_GetOwnPropertyNamesAsArray(JSContext *ctx, JSValueConst obj)
+{
+    return JS_GetOwnPropertyNames2(ctx, obj, JS_GPN_STRING_MASK, JS_ITERATOR_KIND_KEY);
+}
+
 /*-------end fuctions for v8 api---------*/

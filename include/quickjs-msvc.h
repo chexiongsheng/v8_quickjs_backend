@@ -994,6 +994,8 @@ JS_BOOL JS_IsDate(JSValueConst obj);
 double JS_GetDate(JSContext *ctx, JSValueConst obj);
 JSValue JS_NewDate(JSContext *ctx, double d);
 JS_BOOL JS_IsRegExp(JSValueConst obj);
+JSValue JS_GetOwnPropertyNamesAsArray(JSContext *ctx, JSValueConst obj);
+
 /*-------end fuctions for v8 api---------*/
 
 #undef js_unlikely

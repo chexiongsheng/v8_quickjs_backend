@@ -793,7 +793,6 @@ void ObjectTemplate::SetInternalFieldCount(int value) {
     internal_field_count_ = value;
 }
 
-
 Local<FunctionTemplate> FunctionTemplate::New(Isolate* isolate, FunctionCallback callback,
                                               Local<Value> data) {
     Local<FunctionTemplate> functionTemplate(new FunctionTemplate());
@@ -933,6 +932,16 @@ Maybe<bool> Object::Set(Local<Context> context,
     return Maybe<bool>(ok);
 }
 
+Maybe<bool> Object::Set(Local<Context> context,
+                uint32_t index, Local<Value> value) {
+    bool ok = false;
+    context->GetIsolate()->Escape(*value);
+    
+    ok = JS_SetPropertyUint32(context->context_, value_, index, value->value_);
+    
+    return Maybe<bool>(ok);
+}
+
 MaybeLocal<Value> Object::Get(Local<Context> context,
                       Local<Value> key) {
     Value* ret = context->GetIsolate()->Alloc<Value>();
@@ -946,6 +955,27 @@ MaybeLocal<Value> Object::Get(Local<Context> context,
     }
     
     return MaybeLocal<Value>(Local<Value>(ret));
+}
+
+MaybeLocal<Value> Object::Get(Local<Context> context,
+                              uint32_t index) {
+    Value* ret = context->GetIsolate()->Alloc<Value>();
+    
+    ret->value_ = JS_GetPropertyUint32(context->context_, value_, index);
+    
+    return MaybeLocal<Value>(Local<Value>(ret));
+}
+
+MaybeLocal<Array> Object::GetOwnPropertyNames(Local<Context> context) {
+    auto properties = JS_GetOwnPropertyNamesAsArray(context->context_, value_);
+    if (JS_IsException(properties)) {
+        return MaybeLocal<Array>();
+    }
+    
+    Array* ret = context->GetIsolate()->Alloc<Array>();
+    ret->value_ = properties;
+    
+    return MaybeLocal<Array>(Local<Array>(ret));
 }
 
 void Object::SetAlignedPointerInInternalField(int index, void* value) {
@@ -993,6 +1023,18 @@ int Object::InternalFieldCount() {
         return 0;
     }
     return objectUdata->len_;
+}
+
+uint32_t Array::Length() const {
+    auto context = Isolate::current_->GetCurrentContext()->context_;
+    auto len = JS_GetProperty(context, value_, JS_ATOM_length);
+    if (JS_IsException(len)) {
+        return 0;
+    }
+    uint32_t ret;
+    JS_ToUint32(context, &ret, len);
+    JS_FreeValue(context, len);
+    return ret;
 }
 
 TryCatch::TryCatch(Isolate* isolate) {

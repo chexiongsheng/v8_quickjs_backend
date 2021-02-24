@@ -684,6 +684,43 @@ int main(int argc, char* argv[]) {
             // Run the script to get the result.
             auto ret = script->Run(context).ToLocalChecked();
         }
+        
+        //GetOwnPropertyNames
+        {
+            const char* csource = R"(
+                gobj1 = {'k1': 1, 'k2': 2}
+                gobj2 = {}
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            auto ret = script->Run(context).ToLocalChecked();
+            
+            auto printProperty = [&](const char* objName) {
+                auto obj = context->Global()->Get(context, v8::String::NewFromUtf8(isolate, objName).ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+                
+                auto propertyNames = obj->GetOwnPropertyNames(context).ToLocalChecked();
+                
+                std::cout << objName << " property count: " << propertyNames->Length() << std::endl;
+                
+                for (int i = 0; i < propertyNames->Length(); i++) {
+                    auto key = propertyNames->Get(context, i).ToLocalChecked();
+                    std::cout << i << " : " << *(v8::String::Utf8Value(isolate, key)) << std::endl;
+                }
+            };
+            
+            printProperty("gobj1");
+            printProperty("gobj2");
+            //printProperty("Math");
+        }
     }
 
     // Dispose the isolate and tear down V8.
