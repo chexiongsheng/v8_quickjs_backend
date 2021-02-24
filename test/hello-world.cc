@@ -690,6 +690,9 @@ int main(int argc, char* argv[]) {
             const char* csource = R"(
                 gobj1 = {'k1': 1, 'k2': 2}
                 gobj2 = {}
+                Object.setPrototypeOf(gobj1, {'k3':3});
+                print('gobj1.k3(1):' + gobj1.k3);
+                print('gobj2.k3(1):' +gobj2.k3);
               )";
 
             // Create a string containing the JavaScript source code.
@@ -720,6 +723,30 @@ int main(int argc, char* argv[]) {
             printProperty("gobj1");
             printProperty("gobj2");
             //printProperty("Math");
+            
+            auto obj1 = context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gobj1").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+            std::cout << "HasOwnProperty('k3'): " << obj1->HasOwnProperty(context, v8::String::NewFromUtf8(isolate, "k3", v8::NewStringType::kNormal).ToLocalChecked()).ToChecked() << std::endl;
+            std::cout << "HasOwnProperty('k2'): " << obj1->HasOwnProperty(context, v8::String::NewFromUtf8(isolate, "k2", v8::NewStringType::kNormal).ToLocalChecked()).ToChecked() << std::endl;
+            auto obj2 = context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "gobj2").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+            auto r = obj2->SetPrototype(context, obj1->GetPrototype());
+            
+            const char* csource2 = R"(
+                print('gobj1.k3(2):' + gobj1.k3);
+                print('gobj2.k3(2):' + gobj2.k3);
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source2 =
+                v8::String::NewFromUtf8(isolate, csource2, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script2 =
+                v8::Script::Compile(context, source2).ToLocalChecked();
+
+            // Run the script to get the result.
+            ret = script2->Run(context).ToLocalChecked();
+            
         }
     }
 

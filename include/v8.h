@@ -56,6 +56,7 @@ class Integer;
 class Int32;
 class EscapableHandleScope;
 class Array;
+class Name;
 
 class V8_EXPORT StartupData {
 public:
@@ -571,6 +572,14 @@ public:
         uint32_t index);
     
     V8_WARN_UNUSED_RESULT MaybeLocal<Array> GetOwnPropertyNames(Local<Context> context);
+    
+    V8_WARN_UNUSED_RESULT Maybe<bool> HasOwnProperty(Local<Context> context,
+        Local<Name> key);
+    
+    Local<Value> GetPrototype();
+    
+    V8_WARN_UNUSED_RESULT Maybe<bool> SetPrototype(Local<Context> context,
+        Local<Value> prototype);
     
     void SetAlignedPointerInInternalField(int index, void* value);
     

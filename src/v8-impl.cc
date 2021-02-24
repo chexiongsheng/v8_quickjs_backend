@@ -978,6 +978,35 @@ MaybeLocal<Array> Object::GetOwnPropertyNames(Local<Context> context) {
     return MaybeLocal<Array>(Local<Array>(ret));
 }
 
+
+Maybe<bool> Object::HasOwnProperty(Local<Context> context,
+                                   Local<Name> key) {
+    JSAtom atom = JS_ValueToAtom(context->context_, key->value_);
+    int ret = JS_GetOwnProperty(Isolate::current_->GetCurrentContext()->context_, nullptr, value_, atom);
+    JS_FreeAtom(context->context_, atom);
+    if (ret < 0) {
+        return Maybe<bool>();
+    } else {
+        return Maybe<bool>((bool)ret);
+    }
+}
+
+Local<Value> Object::GetPrototype() {
+    auto val = JS_GetPrototype(Isolate::current_->GetCurrentContext()->context_, value_);
+    Value* ret = Isolate::current_->Alloc<Value>();
+    ret->value_ = val;
+    return Local<Value>(ret);
+}
+
+Maybe<bool> Object::SetPrototype(Local<Context> context,
+                                 Local<Value> prototype) {
+    if (JS_SetPrototype(Isolate::current_->GetCurrentContext()->context_, value_, prototype->value_) < 0) {
+        return Maybe<bool>(false);
+    } else {
+        return Maybe<bool>(true);
+    }
+}
+
 void Object::SetAlignedPointerInInternalField(int index, void* value) {
     ObjectUserData* objectUdata = reinterpret_cast<ObjectUserData*>(JS_GetOpaque(value_, Isolate::current_->class_id_));
     //if (index == 0) std::cout << "SetAlignedPointerInInternalField, value:" << value << ", objptr:" << JS_VALUE_GET_PTR(value_) << std::endl;
