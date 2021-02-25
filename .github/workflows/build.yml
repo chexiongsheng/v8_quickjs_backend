@@ -96,9 +96,11 @@ jobs:
         
   build_window_dll_md:
     name: Windows MD
-    runs-on: windows-2019
+    runs-on: windows-2016
     steps:
     - uses: actions/checkout@v2
+    - name: Insatll MSVC
+        uses: microsoft/setup-msbuild@v1.0.2
     - uses: msys2/setup-msys2@v2
       with:
         update: true
