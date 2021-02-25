@@ -53926,4 +53926,84 @@ JSValue JS_GetOwnPropertyNamesAsArray(JSContext *ctx, JSValueConst obj)
     return JS_GetOwnPropertyNames2(ctx, obj, JS_GPN_STRING_MASK, JS_ITERATOR_KIND_KEY);
 }
 
+JSValue JS_NewMap(JSContext *ctx)
+{
+    JSMapState *s;
+    JSValue obj;
+
+    obj = js_create_from_ctor(ctx, JS_UNDEFINED, JS_CLASS_MAP);
+    if (JS_IsException(obj))
+        return JS_EXCEPTION;
+    s = js_mallocz(ctx, sizeof(*s));
+    if (!s)
+        goto fail;
+    init_list_head(&s->records);
+    s->is_weak = FALSE;
+    JS_SetOpaque(obj, s);
+    s->hash_size = 1;
+    s->hash_table = js_malloc(ctx, sizeof(s->hash_table[0]) * s->hash_size);
+    if (!s->hash_table)
+        goto fail;
+    init_list_head(&s->hash_table[0]);
+    s->record_count_threshold = 4;
+
+    return obj;
+    fail:
+    JS_FreeValue(ctx, obj);
+    return JS_EXCEPTION;
+}
+
+JSValue JS_MapSet(JSContext *ctx, JSValueConst this_val,
+                          JSValueConst key, JSValueConst value)
+{
+    JSMapState *s = JS_GetOpaque2(ctx, this_val, JS_CLASS_MAP);
+    JSMapRecord *mr;
+
+    if (!s)
+        return JS_EXCEPTION;
+    key = map_normalize_key(ctx, key);
+    if (s->is_weak && !JS_IsObject(key))
+        return JS_ThrowTypeErrorNotAnObject(ctx);
+
+    mr = map_find_record(ctx, s, key);
+    if (mr) {
+        JS_FreeValue(ctx, mr->value);
+    } else {
+        mr = map_add_record(ctx, s, key);
+        if (!mr)
+            return JS_EXCEPTION;
+    }
+    mr->value = JS_DupValue(ctx, value);
+    return JS_DupValue(ctx, this_val);
+}
+
+JSValue JS_MapGet(JSContext *ctx, JSValueConst this_val,
+                          JSValueConst key)
+{
+    JSMapState *s = JS_GetOpaque2(ctx, this_val, JS_CLASS_MAP);
+    JSMapRecord *mr;
+
+    if (!s)
+        return JS_EXCEPTION;
+    mr = map_find_record(ctx, s, key);
+    if (!mr)
+        return JS_UNDEFINED;
+    else
+        return JS_DupValue(ctx, mr->value);
+}
+
+void JS_MapClear(JSContext *ctx, JSValueConst this_val)
+{
+    JSMapState *s = JS_GetOpaque2(ctx, this_val, JS_CLASS_MAP);
+    struct list_head *el, *el1;
+    JSMapRecord *mr;
+
+    if (!s)
+        return;
+    list_for_each_safe(el, el1, &s->records) {
+        mr = list_entry(el, JSMapRecord, link);
+        map_delete_record(ctx->rt, s, mr);
+    }
+}
+
 /*-------end fuctions for v8 api---------*/

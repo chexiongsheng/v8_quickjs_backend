@@ -614,6 +614,21 @@ public:
     }
 };
 
+class V8_EXPORT Map : public Object {
+public:
+    void Clear();
+    V8_WARN_UNUSED_RESULT MaybeLocal<Value> Get(Local<Context> context,
+        Local<Value> key);
+    V8_WARN_UNUSED_RESULT MaybeLocal<Map> Set(Local<Context> context,
+        Local<Value> key,
+        Local<Value> value);
+    static Local<Map> New(Isolate* isolate);
+
+    V8_INLINE static Map* Cast(Value* obj) {
+        return static_cast<Map*>(obj);
+    }
+};
+
 enum class ArrayBufferCreationMode { kInternalized, kExternalized };
 
 class V8_EXPORT ArrayBuffer : public Object {

@@ -31,6 +31,8 @@
 #include "Blob/iOS/arm64/SnapshotBlob.h"
 #endif
 
+template <typename T> inline void __USE(T&&) {}
+
 static void Add(const v8::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* Isolate = info.GetIsolate();
     v8::Isolate::Scope IsolateScope(Isolate);
@@ -747,6 +749,56 @@ int main(int argc, char* argv[]) {
             // Run the script to get the result.
             ret = script2->Run(context).ToLocalChecked();
             
+        }
+        
+        //Map
+        {
+            v8::Local<v8::Map> map = v8::Map::New(isolate);
+            
+            __USE(context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "gmap").ToLocalChecked(), map));
+            
+            __USE(map->Set(context, v8::String::NewFromUtf8(isolate, "k").ToLocalChecked(), v8::String::NewFromUtf8(isolate, "kk").ToLocalChecked()));
+            
+            const char* csource = R"(
+                print(gmap instanceof Map);
+                print('k:' + gmap.get('k'));
+                gmap.set('kk', 'kkk')
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source =
+                v8::String::NewFromUtf8(isolate, csource, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script =
+                v8::Script::Compile(context, source).ToLocalChecked();
+
+            // Run the script to get the result.
+            __USE(script->Run(context).ToLocalChecked());
+            
+            auto val = map->Get(context, v8::String::NewFromUtf8(isolate, "kk").ToLocalChecked()).ToLocalChecked();
+            
+            std::cout << "kk set by script: " << *(v8::String::Utf8Value(isolate, val)) << std::endl;
+            
+            map->Clear();
+            
+            const char* csource2 = R"(
+                print('k:' + gmap.get('k'));
+                print('kk:' + gmap.get('kk'));
+              )";
+
+            // Create a string containing the JavaScript source code.
+            v8::Local<v8::String> source2 =
+                v8::String::NewFromUtf8(isolate, csource2, v8::NewStringType::kNormal)
+                .ToLocalChecked();
+
+            // Compile the source code.
+            v8::Local<v8::Script> script2 =
+                v8::Script::Compile(context, source2).ToLocalChecked();
+
+            // Run the script to get the result.
+            __USE(script2->Run(context).ToLocalChecked());
         }
     }
 

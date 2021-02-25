@@ -996,6 +996,13 @@ JSValue JS_NewDate(JSContext *ctx, double d);
 JS_BOOL JS_IsRegExp(JSValueConst obj);
 JSValue JS_GetOwnPropertyNamesAsArray(JSContext *ctx, JSValueConst obj);
 
+JSValue JS_NewMap(JSContext *ctx);
+JSValue JS_MapSet(JSContext *ctx, JSValueConst this_val,
+                  JSValueConst key, JSValueConst value);
+JSValue JS_MapGet(JSContext *ctx, JSValueConst this_val,
+                  JSValueConst key);
+void JS_MapClear(JSContext *ctx, JSValueConst this_val);
+
 /*-------end fuctions for v8 api---------*/
 
 #undef js_unlikely

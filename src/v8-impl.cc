@@ -543,6 +543,39 @@ double Date::ValueOf() const {
     return JS_GetDate(Isolate::current_->current_context_->context_, value_);
 }
 
+void Map::Clear() {
+    JS_MapClear(Isolate::current_->GetCurrentContext()->context_, value_);
+}
+
+MaybeLocal<Value> Map::Get(Local<Context> context,
+                           Local<Value> key) {
+    JSValue v = JS_MapGet(context->context_, value_, key->value_);
+    if (JS_IsException(v)) {
+        return MaybeLocal<Value>();
+    }
+    Value *val = context->GetIsolate()->Alloc<Value>();
+    val->value_ = v;
+    return MaybeLocal<Value>(Local<Value>(val));
+}
+
+MaybeLocal<Map> Map::Set(Local<Context> context,
+                         Local<Value> key,
+                         Local<Value> value) {
+    JSValue m = JS_MapSet(context->context_, value_, key->value_, value->value_);
+    if (JS_IsException(m)) {
+        return MaybeLocal<Map>();
+    }
+    Map *map = context->GetIsolate()->Alloc<Map>();
+    map->value_ = m;
+    return MaybeLocal<Map>(Local<Map>(map));
+}
+
+Local<Map> Map::New(Isolate* isolate) {
+    Map *map = isolate->Alloc<Map>();
+    map->value_ = JS_NewMap(isolate->GetCurrentContext()->context_);
+    return Local<Map>(map);
+}
+
 static std::vector<uint8_t> dummybuffer;
 
 Local<ArrayBuffer> ArrayBuffer::New(Isolate* isolate, size_t byte_length) {
