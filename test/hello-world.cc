@@ -404,6 +404,12 @@ int main(int argc, char* argv[]) {
             auto binded = tpl->GetFunction(context).ToLocalChecked()->NewInstance(context, 1, args);
             context->Global()->Set(context, v8::String::NewFromUtf8(isolate, "g_map").ToLocalChecked(), binded.ToLocalChecked()).Check();
             
+            std::cout << "is tpl ? " << tpl->HasInstance(binded.ToLocalChecked()) << std::endl;
+            std::cout << "is basetpl ? " << base_tpl->HasInstance(binded.ToLocalChecked()) << std::endl;
+            auto math = context->Global()->Get(context, v8::String::NewFromUtf8(isolate, "Math").ToLocalChecked()).ToLocalChecked().As<v8::Object>();
+            std::cout << "Math is tpl ? " << tpl->HasInstance(math) << std::endl;
+            std::cout << "Math is basetpl ? " << base_tpl->HasInstance(math) << std::endl;
+            
             //绑定的方案2
             //auto stack_map_obj = tpl->InstanceTemplate()->NewInstance(context).ToLocalChecked();
             //stack_map_obj->SetAlignedPointerInInternalField(0, &stack_map);

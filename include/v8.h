@@ -1290,6 +1290,8 @@ public:
     V8_WARN_UNUSED_RESULT MaybeLocal<Function> GetFunction(
         Local<Context> context);
     
+    bool HasInstance(Local<Value> object);
+    
     Local<ObjectTemplate> InstanceTemplate();
     
     void Inherit(Local<FunctionTemplate> parent);

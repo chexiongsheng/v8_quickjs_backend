@@ -945,6 +945,14 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
     return MaybeLocal<Function>(ret);
 }
 
+bool FunctionTemplate::HasInstance(Local<Value> object) {
+    auto Context = Isolate::current_->GetCurrentContext();
+    auto Func = GetFunction(Context).ToLocalChecked();
+    int b = JS_IsInstanceOf(Isolate::current_->GetCurrentContext()->context_, object->value_, Func->value_);
+    if (b < 0) return false;
+    return (bool)b;
+}
+
 FunctionTemplate::~FunctionTemplate() {
     for(auto it : context_to_funtion_) {
         JS_FreeValueRT(isolate_->runtime_, it.second);
