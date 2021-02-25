@@ -1,5 +1,6 @@
 #include "v8.h"
 #include<cstring>
+#include <algorithm>
 
 enum
 {
