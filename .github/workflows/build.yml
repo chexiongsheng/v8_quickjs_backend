@@ -72,20 +72,20 @@ jobs:
       run: |
         ./make_win.sh
         ls build
-    - name: Build
-      run: |
-        cd win
-        .\make_win64.bat
-    - uses: ilammy/msvc-dev-cmd@v1
-    - name: Merge Libs
-      run: |
-        cd win
-        LIB.EXE /OUT:quickjs.dll.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
+    #- name: Build
+    #  run: |
+    #    cd win
+    #    .\make_win64.bat
+    #- uses: ilammy/msvc-dev-cmd@v1
+    #- name: Merge Libs
+    #  run: |
+    #    cd win
+    #    LIB.EXE /OUT:quickjs.dll.lib ..\build\libquickjs.dll.a build\Release\v8qjs.lib
     - name: Prepare
       shell: msys2 {0}
       run: |
         mkdir -p qjs/Lib/Win64/
-        cp win/quickjs.dll.lib qjs/Lib/Win64/
+        cp build/libquickjs.dll.a qjs/Lib/Win64/
         cp build/msys-quickjs.dll qjs/Lib/Win64/
         cp /mingw64/bin/libgcc_s_seh-1.dll qjs/Lib/Win64/
         cp /mingw64/bin/libwinpthread-1.dll qjs/Lib/Win64/
