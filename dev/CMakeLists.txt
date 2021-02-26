@@ -29,7 +29,6 @@ set(SRC_FILES
         quickjs/libregexp.c
         quickjs/libunicode.c
         quickjs/quickjs.c
-        src/quickjs-wrap.c
         src/v8-impl.cc
         )
         
