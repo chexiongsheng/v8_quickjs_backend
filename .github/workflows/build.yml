@@ -13,11 +13,13 @@ jobs:
       run: sudo xcode-select -switch "/Applications/Xcode_12.app"
     - name: Run build script
       run: |
-        ./make_osx.sh
-        cp -r include ~/qjs/Inc
+        cd $GITHUB_WORKSPACE
+        chmod 777 make_osx.sh
+        sh ./make_osx.sh
+        cp -r include ~/qjs/quickjs/Inc
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: ~/qjs/**/*
         
   build_ios:
@@ -29,10 +31,12 @@ jobs:
       run: sudo xcode-select -switch "/Applications/Xcode_12.app"
     - name: Run build script
       run: |
-        ./make_ios.sh
+        cd $GITHUB_WORKSPACE
+        chmod 777 make_ios.sh
+        sh ./make_ios.sh
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: ~/qjs/**/*
 
   build_android:
@@ -49,10 +53,12 @@ jobs:
         export ANDROID_NDK=~/android-ndk-r21b
     - name: Run build script
       run: |
+        cd $GITHUB_WORKSPACE
+        chmod 777 make_android.sh
         ./make_android.sh
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: ~/qjs/**/*
 
   build_window_dll:
@@ -70,8 +76,7 @@ jobs:
         echo "\"mingw32-make\" \"\$@\"" >> /mingw64/bin/make
     - shell: msys2 {0}
       run: |
-        ./make_win.sh
-        ls build
+        sh ./make_win.sh
     - name: Build
       run: |
         cd win
@@ -84,16 +89,14 @@ jobs:
     - name: Prepare
       shell: msys2 {0}
       run: |
-        mkdir -p qjs/Lib/Win64/
-        cp win/quickjs.dll.lib qjs/Lib/Win64/
-        cp build/libquickjs.dll.a qjs/Lib/Win64/
-        cp win/build/Release/v8qjs.lib qjs/Lib/Win64/
-        cp build/msys-quickjs.dll qjs/Lib/Win64/
-        cp /mingw64/bin/libgcc_s_seh-1.dll qjs/Lib/Win64/
-        cp /mingw64/bin/libwinpthread-1.dll qjs/Lib/Win64/
+        mkdir -p qjs/quickjs/Lib/Win64/
+        cp win/quickjs.dll.lib qjs/quickjs/Lib/Win64/
+        cp build/msys-quickjs.dll qjs/quickjs/Lib/Win64/
+        cp /mingw64/bin/libgcc_s_seh-1.dll qjs/quickjs/Lib/Win64/
+        cp /mingw64/bin/libwinpthread-1.dll qjs/quickjs/Lib/Win64/
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: qjs/**/*
         
   build_window_dll_md:
@@ -113,8 +116,7 @@ jobs:
         echo "\"mingw32-make\" \"\$@\"" >> /mingw64/bin/make
     - shell: msys2 {0}
       run: |
-        ./make_win.sh
-        ls build
+        sh ./make_win.sh
     - name: Build
       run: |
         cd win
@@ -127,14 +129,14 @@ jobs:
     - name: Prepare
       shell: msys2 {0}
       run: |
-        mkdir -p qjs/Lib/Win64MD/
-        cp win/quickjs.dll.lib qjs/Lib/Win64MD/
-        cp build/msys-quickjs.dll qjs/Lib/Win64MD/
-        cp /mingw64/bin/libgcc_s_seh-1.dll qjs/Lib/Win64MD/
-        cp /mingw64/bin/libwinpthread-1.dll qjs/Lib/Win64MD/
+        mkdir -p qjs/quickjs/Lib/Win64MD/
+        cp win/quickjs.dll.lib qjs/quickjs/Lib/Win64MD/
+        cp build/msys-quickjs.dll qjs/quickjs/Lib/Win64MD/
+        cp /mingw64/bin/libgcc_s_seh-1.dll qjs/quickjs/Lib/Win64MD/
+        cp /mingw64/bin/libwinpthread-1.dll qjs/quickjs/Lib/Win64MD/
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: qjs/**/*
 
   build_window_dll32:
@@ -153,7 +155,7 @@ jobs:
         echo "\"mingw32-make\" \"\$@\"" >> /mingw32/bin/make
     - shell: msys2 {0}
       run: |
-        ./make_win.sh
+        sh ./make_win.sh
     - name: Build
       run: |
         cd win
@@ -166,14 +168,14 @@ jobs:
     - name: Prepare
       shell: msys2 {0}
       run: |
-        mkdir -p qjs/Lib/Win32/
-        cp win/quickjs.dll.lib qjs/Lib/Win32/
-        cp build/msys-quickjs.dll qjs/Lib/Win32/
-        cp /mingw32/bin/libgcc_s_dw2-1.dll qjs/Lib/Win32/
-        cp /mingw32/bin/libwinpthread-1.dll qjs/Lib/Win32/
+        mkdir -p qjs/quickjs/Lib/Win32/
+        cp win/quickjs.dll.lib qjs/quickjs/Lib/Win32/
+        cp build/msys-quickjs.dll qjs/quickjs/Lib/Win32/
+        cp /mingw32/bin/libgcc_s_dw2-1.dll qjs/quickjs/Lib/Win32/
+        cp /mingw32/bin/libwinpthread-1.dll qjs/quickjs/Lib/Win32/
     - uses: actions/upload-artifact@v2
       with:
-        name: qjs_v8
+        name: qjs_v8_bin
         path: qjs/**/*
         
 #  build_window:
