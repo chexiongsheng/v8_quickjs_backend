@@ -516,6 +516,8 @@ public:
     bool IsDate() const;
 
     bool IsObject() const;
+    
+    bool IsArray() const;
 
     bool IsBigInt() const;
 
@@ -526,6 +528,8 @@ public:
     bool IsExternal() const;
     
     bool IsInt32() const;
+    
+    bool IsUint32() const;
     
     V8_WARN_UNUSED_RESULT MaybeLocal<BigInt> ToBigInt(
         Local<Context> context) const;

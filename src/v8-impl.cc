@@ -273,6 +273,10 @@ bool Value::IsObject() const {
     return JS_IsObject(value_);
 }
 
+bool Value::IsArray() const {
+    return JS_IsArray(Isolate::current_->GetCurrentContext()->context_, value_);
+}
+
 bool Value::IsBigInt() const {
     return JS_VALUE_GET_TAG(value_) == JS_TAG_BIG_INT;
 }
@@ -290,6 +294,10 @@ bool Value::IsExternal() const {
 }
 
 bool Value::IsInt32() const {
+    return JS_IsNumber(value_);
+}
+
+bool Value::IsUint32() const{
     return JS_IsNumber(value_);
 }
 
