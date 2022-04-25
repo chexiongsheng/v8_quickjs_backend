@@ -1495,8 +1495,6 @@ public:
     Isolate* isolate_;
     HandleScope* prev_scope_;
     
-    std::set<JSValue*> escapes_;
-    
     JSValue scope_value_;
     
 private:

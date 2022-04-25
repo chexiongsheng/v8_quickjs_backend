@@ -219,12 +219,7 @@ Local<Value> Exception::Error(Local<String> message) {
 
 void HandleScope::Escape_(JSValue* val) {
     if (JS_VALUE_HAS_REF_COUNT(*val)) {
-        if (escapes_.find(val) == escapes_.end()) {
-            escapes_.insert(val);
-        }
-        else {
-            JS_DupValueRT(isolate_->runtime_, *val);
-        }
+        JS_DupValueRT(isolate_->runtime_, *val);
     }
 }
 
@@ -234,12 +229,7 @@ void HandleScope::Exit() {
         //std::cout << prev_pos_ << "," << isolate_->value_alloc_pos_ << std::endl;
         isolate_->ForeachAllocValue(prev_pos_, isolate_->value_alloc_pos_, [this](JSValue* val, int idx){
             if (JS_VALUE_HAS_REF_COUNT(*val)) {
-                if (this->escapes_.find(val) == this->escapes_.end()) { //not excaped
-                    //std::cout << "free val type:" << JS_VALUE_GET_TAG(*val) << "," << val << ", idx:" << idx << std::endl;
-                    JS_FreeValueRT(isolate_->runtime_, *val);
-                //} else {
-                    //std::cout << "escaped val type:" << JS_VALUE_GET_TAG(*val) << "," << val << std::endl;
-                }
+                JS_FreeValueRT(isolate_->runtime_, *val);
             }
         });
         isolate_->value_alloc_pos_ = prev_pos_;
@@ -247,9 +237,7 @@ void HandleScope::Exit() {
     }
     
     if (JS_VALUE_HAS_REF_COUNT(scope_value_)) {
-        if (this->escapes_.find(&scope_value_) == this->escapes_.end()) { //not excaped
-            JS_FreeValueRT(isolate_->runtime_, scope_value_);
-        }
+        JS_FreeValueRT(isolate_->runtime_, scope_value_);
     }
 }
 
