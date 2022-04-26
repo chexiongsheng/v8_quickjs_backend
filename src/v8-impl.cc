@@ -194,6 +194,7 @@ void Isolate::LowMemoryNotification() {
 
 Local<Value> Isolate::ThrowException(Local<Value> exception) {
     exception_ = exception->value_;
+    this->Escape(*exception);
     return Local<Value>(exception);
 }
 
@@ -834,7 +835,7 @@ void ObjectTemplate::InitAccessors(Local<Context> context, JSValue obj) {
                 if (!JS_IsUndefined(isolate->exception_)) {
                     JSValue ex = isolate->exception_;
                     isolate->exception_ = JS_Undefined();
-                    isolate->Escape(&ex);
+                    //isolate->Escape(&ex);
                     return JS_Throw(ctx, ex);
                 }
                 
@@ -864,7 +865,7 @@ void ObjectTemplate::InitAccessors(Local<Context> context, JSValue obj) {
                 if (!JS_IsUndefined(isolate->exception_)) {
                     JSValue ex = isolate->exception_;
                     isolate->exception_ = JS_Undefined();
-                    isolate->Escape(&ex);
+                    //isolate->Escape(&ex);
                     return JS_Throw(ctx, ex);
                 }
                 
@@ -965,7 +966,7 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         if (!JS_IsUndefined(isolate->exception_)) {
             JSValue ex = isolate->exception_;
             isolate->exception_ = JS_Undefined();
-            isolate->Escape(&ex);
+            //isolate->Escape(&ex);
             return JS_Throw(ctx, ex);
         }
         
