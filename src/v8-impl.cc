@@ -835,7 +835,6 @@ void ObjectTemplate::InitAccessors(Local<Context> context, JSValue obj) {
                 if (!JS_IsUndefined(isolate->exception_)) {
                     JSValue ex = isolate->exception_;
                     isolate->exception_ = JS_Undefined();
-                    //isolate->Escape(&ex);
                     return JS_Throw(ctx, ex);
                 }
                 
@@ -865,7 +864,6 @@ void ObjectTemplate::InitAccessors(Local<Context> context, JSValue obj) {
                 if (!JS_IsUndefined(isolate->exception_)) {
                     JSValue ex = isolate->exception_;
                     isolate->exception_ = JS_Undefined();
-                    //isolate->Escape(&ex);
                     return JS_Throw(ctx, ex);
                 }
                 
@@ -964,6 +962,9 @@ MaybeLocal<Function> FunctionTemplate::GetFunction(Local<Context> context) {
         callback(callbackInfo);
         
         if (!JS_IsUndefined(isolate->exception_)) {
+            if (callbackInfo.isConstructCall && internal_field_count > 0) {
+                JS_FreeValue(ctx, callbackInfo.this_);
+            }
             JSValue ex = isolate->exception_;
             isolate->exception_ = JS_Undefined();
             //isolate->Escape(&ex);
