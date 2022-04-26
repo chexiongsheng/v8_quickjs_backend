@@ -203,7 +203,14 @@ void Isolate::SetPromiseRejectCallback(PromiseRejectCallback cb) {
                                                    JSValueConst reason,
                                                    JS_BOOL is_handled, void *opaque) {
         PromiseRejectCallback callback = (PromiseRejectCallback)opaque;
-        callback(PromiseRejectMessage(promise, is_handled ? kPromiseHandlerAddedAfterReject : kPromiseRejectWithNoHandler,  reason));
+        auto sptr = reinterpret_cast<Context*>(JS_GetContextOpaque(ctx));
+        Isolate* isolate = sptr->GetIsolate();
+
+        Isolate::Scope isolateScope(isolate);
+        HandleScope handleScope(isolate);
+        v8::Context::Scope contextScope(Local<Context>(context));
+
+        callback(PromiseRejectMessage(promise, is_handled ? kPromiseHandlerAddedAfterReject : kPromiseRejectWithNoHandler, reason));
     }, (void*)cb);
 }
 
@@ -217,9 +224,37 @@ Local<Value> Exception::Error(Local<String> message) {
     return Local<Value>(val);
 }
 
+Local<Message> v8::Exception::CreateMessage(Isolate* isolate_, Local<Value> exception) {
+    JSValueConst catched_ = exception->value_;
+    JSValue fileNameVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_fileName);
+    JSValue lineNumVal = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_lineNumber);
+    
+    Local<v8::Message> message(new v8::Message());
+    
+    if (JS_IsUndefined(fileNameVal)) {
+        message->resource_name_ = "<unknow>";
+        message->line_number_ = - 1;
+    } else {
+        const char* fileName = JS_ToCString(isolate_->current_context_->context_, fileNameVal);
+        message->resource_name_ = fileName;
+        JS_FreeCString(isolate_->current_context_->context_, fileName);
+        JS_ToInt32(isolate_->current_context_->context_, &message->line_number_, lineNumVal);
+    }
+    
+    JS_FreeValue(isolate_->current_context_->context_, lineNumVal);
+    JS_FreeValue(isolate_->current_context_->context_, fileNameVal);
+    
+    return message;
+}
+
 void HandleScope::Escape_(JSValue* val) {
     if (JS_VALUE_HAS_REF_COUNT(*val)) {
-        JS_DupValueRT(isolate_->runtime_, *val);
+        if (escapes_.find(val) == escapes_.end()) {
+            escapes_.insert(val);
+        }
+        else {
+            JS_DupValueRT(isolate_->runtime_, *val);
+        }
     }
 }
 
@@ -229,7 +264,12 @@ void HandleScope::Exit() {
         //std::cout << prev_pos_ << "," << isolate_->value_alloc_pos_ << std::endl;
         isolate_->ForeachAllocValue(prev_pos_, isolate_->value_alloc_pos_, [this](JSValue* val, int idx){
             if (JS_VALUE_HAS_REF_COUNT(*val)) {
-                JS_FreeValueRT(isolate_->runtime_, *val);
+                if (this->escapes_.find(val) == this->escapes_.end()) { //not excaped
+                    //std::cout << "free val type:" << JS_VALUE_GET_TAG(*val) << "," << val << ", idx:" << idx << std::endl;
+                    JS_FreeValueRT(isolate_->runtime_, *val);
+                //} else {
+                    //std::cout << "escaped val type:" << JS_VALUE_GET_TAG(*val) << "," << val << std::endl;
+                }
             }
         });
         isolate_->value_alloc_pos_ = prev_pos_;
@@ -237,7 +277,9 @@ void HandleScope::Exit() {
     }
     
     if (JS_VALUE_HAS_REF_COUNT(scope_value_)) {
-        JS_FreeValueRT(isolate_->runtime_, scope_value_);
+        if (this->escapes_.find(&scope_value_) == this->escapes_.end()) { //not excaped
+            JS_FreeValueRT(isolate_->runtime_, scope_value_);
+        }
     }
 }
 
@@ -406,8 +448,6 @@ MaybeLocal<Script> Script::Compile(
 static V8_INLINE MaybeLocal<Value> ProcessResult(Isolate *isolate, JSValue ret) {
     Value* val = nullptr;
     if (JS_IsException(ret)) {
-        JS_FreeValue(isolate->current_context_->context_, ret);
-        
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
@@ -612,6 +652,13 @@ ArrayBuffer::Contents ArrayBuffer::GetContents() {
     ArrayBuffer::Contents ret;
     ret.data_ = JS_GetArrayBuffer(Isolate::current_->current_context_->context_, &ret.byte_length_, value_);
     return ret;
+}
+
+std::shared_ptr<BackingStore> ArrayBuffer::GetBackingStore() {
+    BackingStore *ret = new BackingStore;
+    ret->data_ = JS_GetArrayBuffer(Isolate::current_->current_context_->context_, &ret->byte_length_, value_);
+    std::shared_ptr<BackingStore> ptr(ret);
+    return ptr;
 }
 
 Local<ArrayBuffer> ArrayBufferView::Buffer() {
@@ -1157,6 +1204,14 @@ Local<Value> TryCatch::Exception() const {
 MaybeLocal<Value> TryCatch::StackTrace(Local<Context> context) const {
     auto str = context->GetIsolate()->Alloc<String>();
     str->value_ = JS_GetProperty(isolate_->current_context_->context_, catched_, JS_ATOM_stack);;
+    return MaybeLocal<Value>(Local<String>(str));
+}
+
+MaybeLocal<Value> TryCatch::StackTrace(
+        Local<Context> context, Local<Value> exception) {
+    auto isolate_ = context->GetIsolate();
+    auto str = isolate_->Alloc<String>();
+    str->value_ = JS_GetProperty(isolate_->current_context_->context_, exception->value_, JS_ATOM_stack);
     return MaybeLocal<Value>(Local<String>(str));
 }
     
