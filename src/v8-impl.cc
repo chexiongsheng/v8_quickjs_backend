@@ -194,6 +194,7 @@ void Isolate::LowMemoryNotification() {
 
 Local<Value> Isolate::ThrowException(Local<Value> exception) {
     exception_ = exception->value_;
+    this->Escape(*exception);
     return Local<Value>(exception);
 }
 
@@ -405,6 +406,8 @@ MaybeLocal<Script> Script::Compile(
 static V8_INLINE MaybeLocal<Value> ProcessResult(Isolate *isolate, JSValue ret) {
     Value* val = nullptr;
     if (JS_IsException(ret)) {
+        JS_FreeValue(isolate->current_context_->context_, ret);
+        
         isolate->handleException();
         return MaybeLocal<Value>();
     } else {
@@ -1140,6 +1143,7 @@ TryCatch::TryCatch(Isolate* isolate) {
     
 TryCatch::~TryCatch() {
     isolate_->currentTryCatch_ = prev_;
+    JS_FreeValue(isolate_->current_context_->context_, catched_);
 }
     
 bool TryCatch::HasCaught() const {
