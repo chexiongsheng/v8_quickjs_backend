@@ -194,7 +194,6 @@ void Isolate::LowMemoryNotification() {
 
 Local<Value> Isolate::ThrowException(Local<Value> exception) {
     exception_ = exception->value_;
-    this->Escape(*exception);
     return Local<Value>(exception);
 }
 
@@ -1141,7 +1140,6 @@ TryCatch::TryCatch(Isolate* isolate) {
     
 TryCatch::~TryCatch() {
     isolate_->currentTryCatch_ = prev_;
-    JS_FreeValue(isolate_->current_context_->context_, catched_);
 }
     
 bool TryCatch::HasCaught() const {
